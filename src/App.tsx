@@ -35,8 +35,7 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
   // 將 rank 與 suit 轉換為 svg-cards 的 ID 格式
   // 規則: spades A -> spade_A, hearts 10 -> heart_10
   const suitName = card.suit.slice(0, -1); // spades -> spade
-  const rankName = card.rank === 'T' ? '10' : card.rank;
-  const cardId = `${suitName}_${rankName}`;
+  const cardId = `${suitName}_${card.rank}`;
   
   return (
     <div 
