@@ -66,8 +66,27 @@ const App: React.FC = () => {
   const [userLowWinnerIds, setUserLowWinnerIds] = useState<number[]>([]);
   const [showShowdownResult, setShowShowdownResult] = useState(false);
 
-  const updateStreak = (correct: boolean) => {
+  // --- Leaderboard & Scoring States ---
+  const [startTime, setStartTime] = useState<number>(0);
+  const [totalScore, setTotalScore] = useState<number>(0);
+  const [lastPoints, setLastPoints] = useState<number>(0);
+
+  const calculatePoints = (basePoints: number) => {
+    const duration = (Date.now() - startTime) / 1000;
+    const timeFactor = Math.max(1, 30 - duration) / 30; // 30秒內有加成
+    const difficultyMap = { 'HOLDEM': 1, 'OMAHA': 1.5, 'BIGO': 2 };
+    const diffMultiplier = difficultyMap[variant] || 1;
+    const streakMultiplier = 1 + (streak * 0.1);
+    
+    const points = Math.round(basePoints * diffMultiplier * timeFactor * streakMultiplier);
+    setLastPoints(points);
+    setTotalScore(prev => prev + points);
+    return points;
+  };
+
+  const updateStreak = (correct: boolean, basePointsForScore: number = 0) => {
     if (correct) {
+      if (basePointsForScore > 0) calculatePoints(basePointsForScore);
       setStreak(s => {
         const next = s + 1;
         if (next > bestStreak) setBestStreak(next);
@@ -88,6 +107,7 @@ const App: React.FC = () => {
     setPayoutAnswers({});
     setShowPotResult(false);
     setStage('POTS');
+    setStartTime(Date.now());
   };
 
   const initShowdown = () => {
@@ -97,6 +117,7 @@ const App: React.FC = () => {
     setUserHighWinnerIds([]);
     setUserLowWinnerIds([]);
     setShowShowdownResult(false);
+    setStartTime(Date.now());
   };
 
   useEffect(() => {
@@ -112,12 +133,16 @@ const App: React.FC = () => {
 
     const handlePotCheck = () => {
       setShowPotResult(true);
-      if (!allPotsCorrect) updateStreak(false);
+      if (!allPotsCorrect) {
+        updateStreak(false);
+      } else {
+        updateStreak(true, 500);
+      }
     };
 
     const handlePayoutCheck = () => {
       setShowPotResult(true);
-      updateStreak(allPayoutsCorrect);
+      updateStreak(allPayoutsCorrect, 1000);
     };
 
     return (
@@ -323,7 +348,7 @@ const App: React.FC = () => {
 
         <div className="max-w-md mx-auto space-y-4 text-center px-4">
           {!showShowdownResult ? (
-            <button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect);}} className="w-full bg-poker-gold text-poker-green font-black py-4 rounded-xl shadow-xl transition-all uppercase text-xs">確認分配結果</button>
+            <button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect, 800);}} className="w-full bg-poker-gold text-poker-green font-black py-4 rounded-xl shadow-xl transition-all uppercase text-xs">確認分配結果</button>
           ) : (
             <div className="space-y-3">
               <div className={cn("p-4 rounded-xl font-bold text-lg md:text-xl border-2", isCorrect ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>{isCorrect ? "判斷正確！" : "判斷錯誤。"}</div>
@@ -341,6 +366,11 @@ const App: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div className="flex items-center gap-3 bg-black/40 px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl border border-white/10 shadow-lg w-full sm:w-auto justify-between sm:justify-start">
             <div className="flex flex-col items-center border-r border-white/20 pr-3 md:pr-4">
+              <span className="text-[8px] md:text-[10px] text-poker-gold font-bold uppercase tracking-widest">Points</span>
+              <div className="flex items-center gap-1 text-poker-gold"><Coins className="w-3 h-3 md:w-4 md:h-4" /><span className="text-xl md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
+              {lastPoints > 0 && <div className="text-[8px] text-green-400 font-bold animate-bounce">+{lastPoints}</div>}
+            </div>
+            <div className="flex flex-col items-center border-r border-white/20 px-3 md:px-4">
               <span className="text-[8px] md:text-[10px] text-poker-gold font-bold uppercase tracking-widest">Streak</span>
               <div className="flex items-center gap-1"><Flame className={cn("w-4 h-4 md:w-5 md:h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-xl md:text-2xl font-black">{streak}</span></div>
             </div>
