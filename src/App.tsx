@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
-import { Trophy, RefreshCw, CheckCircle2, XCircle, Info, Users, Coins, ArrowRight, Wallet, Medal, Eye, Calculator, Star, Flame } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { Trophy, RefreshCw, CheckCircle2, XCircle, Info, Users, Coins, ArrowRight, Wallet, Medal, Eye, Calculator, Star, Flame, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+// --- Supabase Configuration ---
+const SUPABASE_URL = 'https://rnvmtdlyowunemwitmvg.supabase.co'; 
+const SUPABASE_ANON_KEY = 'sb_publishable_R2ZK679gVDrOv3X9Dbvfsw_Dw7Sd5N0';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -77,8 +83,46 @@ const App: React.FC = () => {
   const [playerName, setPlayerName] = useState("");
   const [finalScore, setFinalScore] = useState(0);
   const [finalStreak, setFinalStreak] = useState(0);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingRank, setIsLoadingRank] = useState(false);
 
-  const calculatePoints = (basePoints: number) => {
+  const fetchLeaderboard = async () => {
+    setIsLoadingRank(true);
+    try {
+      const { data, error } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .order('score', { ascending: false })
+        .limit(10);
+      if (data) setLeaderboard(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingRank(false);
+    }
+  };
+
+  const handleSubmitScore = async () => {
+    if (!playerName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('leaderboard').insert([
+        { name: playerName, score: finalScore, streak: finalStreak }
+      ]);
+      if (!error) {
+        setShowSubmitModal(false);
+        setPlayerName("");
+        setTotalScore(0);
+        fetchLeaderboard();
+        setShowRankModal(true);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
     const duration = (Date.now() - startTime) / 1000;
     let timeMultiplier = 1.0;
     
@@ -401,7 +445,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-3 order-first sm:order-none w-full sm:w-auto justify-between">
             <h1 className="text-xl md:text-2xl font-black text-poker-gold flex items-center gap-2"><Trophy className="w-5 h-5 md:w-6 md:h-6" /> DEALERPRO</h1>
             <div className="flex gap-2">
-              <button onClick={() => setShowRankModal(true)} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><Medal className="w-3 h-3 md:w-4 md:h-4 text-poker-gold" /> 排行榜</button>
+              <button onClick={() => { fetchLeaderboard(); setShowRankModal(true); }} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><Medal className="w-3 h-3 md:w-4 md:h-4 text-poker-gold" /> 排行榜</button>
               <button onClick={mode === 'SPLIT_POT' ? initSplitPot : initShowdown} className="flex items-center gap-2 bg-poker-gold hover:bg-yellow-500 text-poker-green px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><RefreshCw className="w-3 h-3 md:w-4 md:h-4" /> 重新出題</button>
             </div>
           </div>
@@ -448,7 +492,13 @@ const App: React.FC = () => {
               />
               <div className="flex gap-3">
                 <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">跳過</button>
-                <button onClick={() => setShowSubmitModal(false)} className="flex-1 bg-poker-gold text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg">登錄排行</button>
+                <button 
+                  onClick={handleSubmitScore} 
+                  disabled={isSubmitting || !playerName.trim()}
+                  className="flex-1 bg-poker-gold disabled:opacity-50 text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "登錄排行"}
+                </button>
               </div>
             </div>
           </div>
@@ -463,21 +513,30 @@ const App: React.FC = () => {
                 <button onClick={() => setShowRankModal(false)} className="text-slate-500 hover:text-white"><XCircle /></button>
               </div>
               <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {[1, 2, 3, 4, 5].map((rank) => (
-                  <div key={rank} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black", rank === 1 ? "bg-poker-gold text-poker-green" : "bg-slate-800 text-slate-400")}>{rank}</div>
-                      <div>
-                        <div className="font-bold text-white">Dealer_{rank}</div>
-                        <div className="text-[10px] text-slate-500">2026/02/07</div>
+                {isLoadingRank ? (
+                  <div className="flex flex-col items-center py-20 text-slate-500">
+                    <Loader2 className="w-10 h-10 animate-spin mb-4" />
+                    <div className="font-bold uppercase tracking-widest text-xs">讀取排行中...</div>
+                  </div>
+                ) : leaderboard.length > 0 ? (
+                  leaderboard.map((entry, index) => (
+                    <div key={entry.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black", index === 0 ? "bg-poker-gold text-poker-green" : "bg-slate-800 text-slate-400")}>{index + 1}</div>
+                        <div>
+                          <div className="font-bold text-white">{entry.name}</div>
+                          <div className="text-[10px] text-slate-500">{new Date(entry.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-black text-white">{entry.score.toLocaleString()}</div>
+                        <div className="text-[10px] text-poker-gold font-bold uppercase">STREAK: {entry.streak}</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-black text-white">{((10 - rank) * 1500).toLocaleString()}</div>
-                      <div className="text-[10px] text-poker-gold font-bold">STREAK: {12 - rank}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <div className="text-center py-20 text-slate-600 font-bold uppercase tracking-widest text-xs">尚無紀錄</div>
+                )}
               </div>
               <button onClick={() => setShowRankModal(false)} className="mt-8 w-full py-4 bg-white/5 text-slate-400 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-white/10">關閉視窗</button>
             </div>
