@@ -35,7 +35,7 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
   const suitName = card.suit.slice(0, -1); // spades -> spade
   const cardId = `${suitName}_${card.rank}`;
   
-  const baseUrl = import.meta.env.BASE_URL;
+  const baseUrl = (import.meta as any).env.BASE_URL;
   const spritePath = `${baseUrl}poker-cards.svg`;
 
   return (
