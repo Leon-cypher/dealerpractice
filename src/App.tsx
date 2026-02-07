@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
 import { createClient } from '@supabase/supabase-js';
-// @ts-ignore
-import svgCards from 'svg-cards/svg-cards.svg';
 import { Trophy, RefreshCw, CheckCircle2, XCircle, Info, Users, Coins, ArrowRight, Wallet, Medal, Eye, Calculator, Star, Flame, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -37,6 +35,9 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
   const suitName = card.suit.slice(0, -1); // spades -> spade
   const cardId = `${suitName}_${card.rank}`;
   
+  const baseUrl = import.meta.env.BASE_URL;
+  const spritePath = `${baseUrl}poker-cards.svg`;
+
   return (
     <div 
       style={style}
@@ -50,7 +51,7 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
         viewBox="0 0 169.075 244.64" 
         className="w-full h-full drop-shadow-xl hover:scale-105 transition-transform"
       >
-        <use xlinkHref={`${svgCards}#${cardId}`} />
+        <use xlinkHref={`${spritePath}#${cardId}`} />
       </svg>
     </div>
   );
