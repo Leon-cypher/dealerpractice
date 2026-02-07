@@ -14,8 +14,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 複製自 omaha_hilo_calculator 的原始 CSS */
-.poker-card-custom {
+/* ===== 複製自原始專案的 CSS ===== */
+
+/* 撲克牌卡片樣式 (白底版本) */
+.poker-card {
     width: 45px;
     height: 62px;
     background: linear-gradient(135deg, #ffffff, #f8fafc);
@@ -32,10 +34,9 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     position: relative;
     overflow: hidden;
-    color: inherit;
 }
 
-.poker-card-custom::before {
+.poker-card::before {
     content: '';
     position: absolute;
     top: 0;
@@ -46,31 +47,71 @@ body {
     pointer-events: none;
 }
 
-.poker-card-custom.spades { color: #1f2937 !important; }
-.poker-card-custom.hearts { color: #ef4444 !important; }
-.poker-card-custom.diamonds { color: #3b82f6 !important; }
-.poker-card-custom.clubs { color: #10b981 !important; }
-
-.poker-card-rank {
-    font-size: 1.2rem;
-    line-height: 1;
-    z-index: 10;
+.poker-card:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    border-color: #3b82f6;
 }
 
-.poker-card-suit {
-    font-size: 0.7rem;
-    margin-top: 2px;
-    z-index: 10;
+.poker-card.selected {
+    background: linear-gradient(135deg, #6b7280, #374151);
+    color: #9ca3af;
+    border-color: #374151;
+    transform: scale(0.95);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* 針對行動裝置微調尺寸，保持比例 */
-@media (max-width: 640px) {
-  .poker-card-custom {
-    width: 35px;
-    height: 48px;
-    font-size: 11px;
-  }
-  .poker-card-rank {
-    font-size: 0.9rem;
-  }
+.poker-card.spades { color: #1f2937 !important; }
+.poker-card.hearts { color: #ef4444 !important; }
+.poker-card.diamonds { color: #3b82f6 !important; }
+.poker-card.clubs { color: #10b981 !important; }
+
+/* 迷你卡片樣式 (色塊版本) */
+.mini-card {
+    background: rgba(255, 255, 255, 0.9);
+    color: #1f2937;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    min-width: 28px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mini-card.spades {
+    background: linear-gradient(135deg, #374151, #1f2937) !important;
+    color: white !important;
+}
+.mini-card.hearts {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: white !important;
+}
+.mini-card.diamonds {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+    color: white !important;
+}
+.mini-card.clubs {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+}
+
+/* 響應式微調 */
+@media (max-width: 768px) {
+    .poker-card {
+        width: 40px;
+        height: 55px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .poker-card {
+        width: 35px;
+        height: 48px;
+        font-size: 11px;
+    }
 }

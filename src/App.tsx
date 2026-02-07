@@ -12,34 +12,37 @@ function cn(...inputs: ClassValue[]) {
 type MainMode = 'SPLIT_POT' | 'SHOWDOWN';
 
 // --- Card Component ---
-const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?: string; style?: React.CSSProperties }> = ({ card, hidden, className, style }) => {
+const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?: string; style?: React.CSSProperties; mini?: boolean }> = ({ card, hidden, className, style, mini }) => {
   if (hidden) {
     return (
       <div 
         style={style}
-        className={cn("poker-card-custom bg-slate-900 border-slate-700", className)}
+        className={cn("poker-card bg-slate-900 border-slate-700", className)}
       >
         <div className="text-slate-700 font-black text-xl">?</div>
       </div>
     );
   }
+
+  const suitSymbol = {
+    'spades': '♠',
+    'hearts': '♥',
+    'diamonds': '♦',
+    'clubs': '♣'
+  }[card.suit];
   
   return (
     <div 
       style={style}
       className={cn(
-        "poker-card-custom",
+        mini ? "mini-card" : "poker-card",
         card.suit,
         className
       )}
     >
-      <div className="poker-card-rank">{card.rank}</div>
-      <div className="poker-card-suit">
-        {card.suit === 'spades' && '♠'}
-        {card.suit === 'hearts' && '♥'}
-        {card.suit === 'diamonds' && '♦'}
-        {card.suit === 'clubs' && '♣'}
-      </div>
+      <div className={mini ? "" : "text-lg md:text-xl"}>{card.rank}</div>
+      {!mini && <div className="text-[10px] md:text-xs opacity-80">{suitSymbol}</div>}
+      {mini && <span className="ml-0.5">{suitSymbol}</span>}
     </div>
   );
 };
@@ -284,7 +287,7 @@ const App: React.FC = () => {
                 <div className="font-bold text-white text-sm md:text-base">{player.name}</div>
                 <div className="flex flex-wrap justify-center gap-1 mb-1">
                   {player.cards.map((card: any, i: number) => (
-                    <PokerCard key={i} card={card} className="w-8 h-12 sm:w-10 sm:h-14 md:w-12 md:h-18" />
+                    <PokerCard key={i} card={card} mini />
                   ))}
                 </div>
                 <div className="flex gap-2 w-full">
