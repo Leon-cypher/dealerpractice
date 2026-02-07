@@ -71,6 +71,13 @@ const App: React.FC = () => {
   const [totalScore, setTotalScore] = useState<number>(0);
   const [lastPoints, setLastPoints] = useState<number>(0);
 
+  // --- Leaderboard Modals ---
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showRankModal, setShowRankModal] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const [finalScore, setFinalScore] = useState(0);
+  const [finalStreak, setFinalStreak] = useState(0);
+
   const calculatePoints = (basePoints: number) => {
     const duration = (Date.now() - startTime) / 1000;
     let timeMultiplier = 1.0;
@@ -97,8 +104,13 @@ const App: React.FC = () => {
         return next;
       });
     } else {
+      if (totalScore > 0) {
+        setFinalScore(totalScore);
+        setFinalStreak(streak);
+        setShowSubmitModal(true);
+      }
       setStreak(0);
-      setTotalScore(0); // 答錯全歸零，增加練習張力
+      setTotalScore(0);
       setLastPoints(0);
     }
   };
@@ -388,7 +400,10 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-3 order-first sm:order-none w-full sm:w-auto justify-between">
             <h1 className="text-xl md:text-2xl font-black text-poker-gold flex items-center gap-2"><Trophy className="w-5 h-5 md:w-6 md:h-6" /> DEALERPRO</h1>
-            <button onClick={mode === 'SPLIT_POT' ? initSplitPot : initShowdown} className="flex items-center gap-2 bg-poker-gold hover:bg-yellow-500 text-poker-green px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><RefreshCw className="w-3 h-3 md:w-4 md:h-4" /> 重新出題</button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowRankModal(true)} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><Medal className="w-3 h-3 md:w-4 md:h-4 text-poker-gold" /> 排行榜</button>
+              <button onClick={mode === 'SPLIT_POT' ? initSplitPot : initShowdown} className="flex items-center gap-2 bg-poker-gold hover:bg-yellow-500 text-poker-green px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><RefreshCw className="w-3 h-3 md:w-4 md:h-4" /> 重新出題</button>
+            </div>
           </div>
         </div>
 
@@ -412,6 +427,62 @@ const App: React.FC = () => {
         </div>
 
         {mode === 'SPLIT_POT' ? renderSplitPot() : renderShowdown()}
+
+        {/* --- Submission Modal --- */}
+        {showSubmitModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border-2 border-poker-gold p-8 rounded-[2rem] max-w-sm w-full text-center shadow-[0_0_50px_rgba(201,160,80,0.2)]">
+              <Trophy className="w-16 h-16 text-poker-gold mx-auto mb-4" />
+              <h2 className="text-2xl font-black text-white mb-2">練習結束！</h2>
+              <div className="bg-white/5 rounded-2xl p-4 mb-6">
+                <div className="text-slate-400 text-xs uppercase font-bold">最終得分</div>
+                <div className="text-4xl font-black text-poker-gold">{finalScore.toLocaleString()}</div>
+                <div className="text-slate-500 text-[10px] mt-1">連勝次數: {finalStreak}</div>
+              </div>
+              <input 
+                type="text" 
+                placeholder="輸入你的稱號" 
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full bg-black/50 border-2 border-white/10 rounded-xl p-4 text-white text-center font-bold mb-4 focus:border-poker-gold outline-none"
+              />
+              <div className="flex gap-3">
+                <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">跳過</button>
+                <button onClick={() => setShowSubmitModal(false)} className="flex-1 bg-poker-gold text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg">登錄排行</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- Leaderboard Modal --- */}
+        {showRankModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border-2 border-poker-gold/30 p-6 md:p-10 rounded-[2.5rem] max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl">
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-black text-poker-gold tracking-widest flex items-center gap-3"><Medal className="w-8 h-8" /> 全球荷官排行榜</h2>
+                <button onClick={() => setShowRankModal(false)} className="text-slate-500 hover:text-white"><XCircle /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                {[1, 2, 3, 4, 5].map((rank) => (
+                  <div key={rank} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black", rank === 1 ? "bg-poker-gold text-poker-green" : "bg-slate-800 text-slate-400")}>{rank}</div>
+                      <div>
+                        <div className="font-bold text-white">Dealer_{rank}</div>
+                        <div className="text-[10px] text-slate-500">2026/02/07</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-black text-white">{((10 - rank) * 1500).toLocaleString()}</div>
+                      <div className="text-[10px] text-poker-gold font-bold">STREAK: {12 - rank}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowRankModal(false)} className="mt-8 w-full py-4 bg-white/5 text-slate-400 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-white/10">關閉視窗</button>
+            </div>
+          </div>
+        )}
 
         <footer className="mt-12 md:mt-20 text-center text-slate-500 text-[8px] md:text-[10px] border-t border-white/5 pt-8 uppercase tracking-[0.2em]">Professional Dealer Training Utility • 2026</footer>
       </div>
