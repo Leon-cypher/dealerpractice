@@ -24,11 +24,11 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     );
   }
   
-  const suitConfigs: Record<string, { color: string, symbol: string }> = {
-    'spades': { color: 'text-[#1f2937]', symbol: '♠' },
-    'hearts': { color: 'text-[#ef4444]', symbol: '♥' },
-    'diamonds': { color: 'text-[#3b82f6]', symbol: '♦' },
-    'clubs': { color: 'text-[#10b981]', symbol: '♣' }
+  const suitConfigs: Record<string, { bg: string, symbol: string }> = {
+    'spades': { bg: 'bg-gradient-to-br from-[#374151] to-[#1f2937]', symbol: '♠' },
+    'hearts': { bg: 'bg-gradient-to-br from-[#ef4444] to-[#dc2626]', symbol: '♥' },
+    'diamonds': { bg: 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8]', symbol: '♦' },
+    'clubs': { bg: 'bg-gradient-to-br from-[#10b981] to-[#059669]', symbol: '♣' }
   };
 
   const config = suitConfigs[card.suit];
@@ -37,26 +37,26 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     <div 
       style={style}
       className={cn(
-        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-md flex flex-col items-center justify-center relative overflow-hidden transition-all border-2 border-[#e5e7eb]",
-        "bg-gradient-to-br from-white to-[#f8fafc]",
+        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-xl flex flex-col items-center justify-center relative overflow-hidden border border-white/20 transition-all",
+        config.bg,
         className
       )}
     >
-      {/* 頂部光澤感 */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none"></div>
+      {/* 頂部細微反光 */}
+      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
 
-      {/* 內容佈局 (仿照專業版) */}
-      <div className={cn("flex flex-col items-center justify-center", config.color)}>
-        <div className="text-xl sm:text-2xl md:text-4xl font-[900] leading-none select-none tracking-tighter">
-          {card.rank}
-        </div>
-        <div className="text-[10px] md:text-xs font-bold mt-0.5 md:mt-1">
+      {/* 內容：花色與數字並排或堆疊 */}
+      <div className="flex flex-col items-center justify-center text-white">
+        <div className="text-[10px] md:text-sm font-bold opacity-90 leading-none mb-1">
           {config.symbol}
+        </div>
+        <div className="text-xl sm:text-2xl md:text-4xl font-black leading-none select-none tracking-tighter drop-shadow-md">
+          {card.rank}
         </div>
       </div>
       
-      {/* 裝飾性邊界 */}
-      <div className="absolute inset-0 border border-black/5 rounded-lg md:rounded-xl pointer-events-none"></div>
+      {/* 內陰影裝飾 */}
+      <div className="absolute inset-0 border border-black/10 rounded-lg md:rounded-xl pointer-events-none shadow-inner"></div>
     </div>
   );
 };
