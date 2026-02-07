@@ -274,7 +274,7 @@ const App: React.FC = () => {
           <h2 className="text-center text-poker-gold font-black tracking-[0.2em] uppercase mb-4 opacity-50 text-[8px] md:text-[10px]">Community Cards</h2>
           <div className="flex justify-center gap-1.5 md:gap-3 mb-6 md:mb-8 overflow-x-auto pb-2 px-2">
             {showdown.communityCards.map((card: any, i: number) => (
-              <PokerCard key={i} card={card} />
+              <PokerCard key={i} card={card} mini />
             ))}
           </div>
 
