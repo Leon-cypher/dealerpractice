@@ -73,12 +73,16 @@ const App: React.FC = () => {
 
   const calculatePoints = (basePoints: number) => {
     const duration = (Date.now() - startTime) / 1000;
-    const timeFactor = Math.max(1, 30 - duration) / 30; // 30秒內有加成
+    let timeMultiplier = 1.0;
+    
+    if (duration <= 10) timeMultiplier = 1.5;
+    else if (duration <= 15) timeMultiplier = 1.25;
+    
     const difficultyMap = { 'HOLDEM': 1, 'OMAHA': 1.5, 'BIGO': 2 };
     const diffMultiplier = difficultyMap[variant] || 1;
     const streakMultiplier = 1 + (streak * 0.1);
     
-    const points = Math.round(basePoints * diffMultiplier * timeFactor * streakMultiplier);
+    const points = Math.round(basePoints * diffMultiplier * timeMultiplier * streakMultiplier);
     setLastPoints(points);
     setTotalScore(prev => prev + points);
     return points;
@@ -94,6 +98,8 @@ const App: React.FC = () => {
       });
     } else {
       setStreak(0);
+      setTotalScore(0); // 答錯全歸零，增加練習張力
+      setLastPoints(0);
     }
   };
 
