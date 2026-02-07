@@ -24,11 +24,11 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     );
   }
   
-  const suitConfigs: Record<string, { bg: string, symbol: string }> = {
-    'spades': { bg: 'bg-slate-950', symbol: '♠' },
-    'hearts': { bg: 'bg-red-600', symbol: '♥' },
-    'diamonds': { bg: 'bg-blue-600', symbol: '♦' },
-    'clubs': { bg: 'bg-emerald-700', symbol: '♣' }
+  const suitConfigs: Record<string, { bg: string, symbol: string, color: string }> = {
+    'spades': { bg: 'bg-slate-900', symbol: '♠', color: 'text-white' },
+    'hearts': { bg: 'bg-red-700', symbol: '♥', color: 'text-white' },
+    'diamonds': { bg: 'bg-blue-700', symbol: '♦', color: 'text-white' },
+    'clubs': { bg: 'bg-emerald-800', symbol: '♣', color: 'text-white' }
   };
 
   const config = suitConfigs[card.suit];
@@ -37,25 +37,28 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     <div 
       style={style}
       className={cn(
-        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-xl flex flex-col items-center justify-center relative overflow-hidden border border-white/20 transition-all",
+        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-2xl flex flex-col items-center justify-center relative overflow-hidden border-2 border-white/30 transition-all",
         config.bg,
         className
       )}
     >
-      {/* 背景花色水印 */}
-      <div className="absolute -bottom-1 -right-1 text-white/10 text-3xl sm:text-4xl md:text-6xl font-black select-none pointer-events-none">
-        {config.symbol}
+      {/* 頂部裝飾 */}
+      <div className="absolute top-1 left-1.5 opacity-40">
+        <div className={cn("text-[8px] md:text-[10px] font-black leading-none", config.color)}>{card.rank}</div>
       </div>
-      
+
       {/* 中央巨大字樣 */}
-      <div className="text-2xl sm:text-3xl md:text-5xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] select-none tracking-tighter">
+      <div className={cn("text-2xl sm:text-3xl md:text-5xl font-black drop-shadow-lg select-none tracking-tighter", config.color)}>
         {card.rank}
       </div>
+
+      {/* 底部花色符號 */}
+      <div className="absolute bottom-1 right-1.5 opacity-40">
+        <div className={cn("text-[10px] md:text-xs leading-none", config.color)}>{config.symbol}</div>
+      </div>
       
-      {/* 頂部裝飾線條 */}
-      <div className="absolute top-0 left-0 right-0 h-0.5 md:h-1 bg-white/20"></div>
-      
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
+      {/* 光澤效果 */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none"></div>
     </div>
   );
 };
