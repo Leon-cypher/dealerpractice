@@ -136,6 +136,8 @@ const App: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const calculatePoints = (basePoints: number) => {
     const duration = (Date.now() - startTime) / 1000;
     let timeMultiplier = 1.0;
     
