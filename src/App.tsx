@@ -501,16 +501,17 @@ const App: React.FC = () => {
               </div>
               <input 
                 type="text" 
-                placeholder="輸入你的稱號" 
+                placeholder="輸入你的稱號 (最多12字)" 
                 value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
+                maxLength={12}
+                onChange={(e) => setPlayerName(e.target.value.replace(/[<>]/g, ''))}
                 className="w-full bg-black/50 border-2 border-white/10 rounded-xl p-4 text-white text-center font-bold mb-4 focus:border-poker-gold outline-none"
               />
               <div className="flex gap-3">
                 <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">跳過</button>
                 <button 
                   onClick={handleSubmitScore} 
-                  disabled={isSubmitting || !playerName.trim()}
+                  disabled={isSubmitting || !playerName.trim() || playerName.length > 12}
                   className="flex-1 bg-poker-gold disabled:opacity-50 text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "登錄排行"}
