@@ -16,22 +16,22 @@ body {
 
 /* ===== 複製自原始專案的 CSS ===== */
 
-/* 撲克牌卡片樣式 (白底版本) */
+/* 撲克牌卡片樣式 (白底版本) - 調整為更大尺寸 */
 .poker-card {
-    width: 45px;
-    height: 62px;
+    width: 64px;
+    height: 88px;
     background: linear-gradient(135deg, #ffffff, #f8fafc);
     border: 2px solid #e5e7eb;
-    border-radius: 8px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     font-weight: 900;
-    font-size: 14px;
+    font-size: 24px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     position: relative;
     overflow: hidden;
 }
@@ -48,8 +48,8 @@ body {
 }
 
 .poker-card:hover {
-    transform: translateY(-3px) scale(1.05);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
     border-color: #3b82f6;
 }
 
@@ -66,18 +66,20 @@ body {
 .poker-card.diamonds { color: #3b82f6 !important; }
 .poker-card.clubs { color: #10b981 !important; }
 
-/* 迷你卡片樣式 (色塊版本) */
+/* 迷你卡片樣式 (色塊版本) - 調整為更大尺寸 */
 .mini-card {
     background: rgba(255, 255, 255, 0.9);
     color: #1f2937;
-    padding: 4px 6px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 800;
     border: 1px solid rgba(0, 0, 0, 0.1);
-    min-width: 28px;
+    min-width: 44px;
+    height: 56px;
     text-align: center;
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 }
@@ -102,16 +104,26 @@ body {
 /* 響應式微調 */
 @media (max-width: 768px) {
     .poker-card {
-        width: 40px;
-        height: 55px;
-        font-size: 12px;
+        width: 52px;
+        height: 72px;
+        font-size: 18px;
+    }
+    .mini-card {
+        min-width: 36px;
+        height: 48px;
+        font-size: 0.9rem;
     }
 }
 
 @media (max-width: 480px) {
     .poker-card {
-        width: 35px;
-        height: 48px;
-        font-size: 11px;
+        width: 44px;
+        height: 60px;
+        font-size: 16px;
+    }
+    .mini-card {
+        min-width: 32px;
+        height: 42px;
+        font-size: 0.8rem;
     }
 }
