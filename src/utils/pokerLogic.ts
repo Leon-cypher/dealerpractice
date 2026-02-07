@@ -183,14 +183,14 @@ export function generateShowdownScenario(playerCount: number = 2, variant: GameV
       highScore: bestHigh,
       lowScore: bestLow,
       handDescription: getHandDescription(bestHigh),
-      lowDescription: bestLow ? `Low: ${bestLow.toString().split('').join(',')}` : "No Low"
+      lowDescription: bestLow !== null ? `Low: ${String(bestLow).split('').join(',')}` : "No Low"
     });
   }
 
   const maxHighScore = Math.max(...players.map(p => p.highScore));
   
   // For Hi-Lo (Omaha/BIGO), determine low winners
-  const validLowScores = players.filter(p => p.lowScore !== null).map(p => p.lowScore as number);
+  const validLowScores = players.map(p => p.lowScore).filter((score): score is number => score !== null);
   const minLowScore = validLowScores.length > 0 ? Math.min(...validLowScores) : null;
 
   return {
