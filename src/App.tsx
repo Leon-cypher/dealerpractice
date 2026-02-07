@@ -24,11 +24,11 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     );
   }
   
-  const suitConfigs: Record<string, { bg: string, symbol: string, color: string }> = {
-    'spades': { bg: 'bg-slate-900', symbol: '♠', color: 'text-white' },
-    'hearts': { bg: 'bg-red-700', symbol: '♥', color: 'text-white' },
-    'diamonds': { bg: 'bg-blue-700', symbol: '♦', color: 'text-white' },
-    'clubs': { bg: 'bg-emerald-800', symbol: '♣', color: 'text-white' }
+  const suitConfigs: Record<string, { color: string, symbol: string }> = {
+    'spades': { color: 'text-[#1f2937]', symbol: '♠' },
+    'hearts': { color: 'text-[#ef4444]', symbol: '♥' },
+    'diamonds': { color: 'text-[#3b82f6]', symbol: '♦' },
+    'clubs': { color: 'text-[#10b981]', symbol: '♣' }
   };
 
   const config = suitConfigs[card.suit];
@@ -37,28 +37,26 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     <div 
       style={style}
       className={cn(
-        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-2xl flex flex-col items-center justify-center relative overflow-hidden border-2 border-white/30 transition-all",
-        config.bg,
+        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-md flex flex-col items-center justify-center relative overflow-hidden transition-all border-2 border-[#e5e7eb]",
+        "bg-gradient-to-br from-white to-[#f8fafc]",
         className
       )}
     >
-      {/* 頂部裝飾 */}
-      <div className="absolute top-1 left-1.5 opacity-40">
-        <div className={cn("text-[8px] md:text-[10px] font-black leading-none", config.color)}>{card.rank}</div>
-      </div>
+      {/* 頂部光澤感 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none"></div>
 
-      {/* 中央巨大字樣 */}
-      <div className={cn("text-2xl sm:text-3xl md:text-5xl font-black drop-shadow-lg select-none tracking-tighter", config.color)}>
-        {card.rank}
-      </div>
-
-      {/* 底部花色符號 */}
-      <div className="absolute bottom-1 right-1.5 opacity-40">
-        <div className={cn("text-[10px] md:text-xs leading-none", config.color)}>{config.symbol}</div>
+      {/* 內容佈局 (仿照專業版) */}
+      <div className={cn("flex flex-col items-center justify-center", config.color)}>
+        <div className="text-xl sm:text-2xl md:text-4xl font-[900] leading-none select-none tracking-tighter">
+          {card.rank}
+        </div>
+        <div className="text-[10px] md:text-xs font-bold mt-0.5 md:mt-1">
+          {config.symbol}
+        </div>
       </div>
       
-      {/* 光澤效果 */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none"></div>
+      {/* 裝飾性邊界 */}
+      <div className="absolute inset-0 border border-black/5 rounded-lg md:rounded-xl pointer-events-none"></div>
     </div>
   );
 };
