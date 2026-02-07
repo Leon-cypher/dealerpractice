@@ -24,11 +24,11 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     );
   }
   
-  const suitConfigs: Record<string, { bg: string, symbol: string }> = {
-    'spades': { bg: 'bg-gradient-to-br from-[#374151] to-[#1f2937]', symbol: '♠' },
-    'hearts': { bg: 'bg-gradient-to-br from-[#ef4444] to-[#dc2626]', symbol: '♥' },
-    'diamonds': { bg: 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8]', symbol: '♦' },
-    'clubs': { bg: 'bg-gradient-to-br from-[#10b981] to-[#059669]', symbol: '♣' }
+  const suitConfigs: Record<string, { color: string, symbol: string }> = {
+    'spades': { color: 'text-[#1f2937]', symbol: '♠' },
+    'hearts': { color: 'text-[#ef4444]', symbol: '♥' },
+    'diamonds': { color: 'text-[#3b82f6]', symbol: '♦' },
+    'clubs': { color: 'text-[#10b981]', symbol: '♣' }
   };
 
   const config = suitConfigs[card.suit];
@@ -37,26 +37,25 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     <div 
       style={style}
       className={cn(
-        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg md:rounded-xl shadow-xl flex flex-col items-center justify-center relative overflow-hidden border border-white/20 transition-all",
-        config.bg,
+        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-all border-2 border-[#e5e7eb] shadow-[0_2px_8px_rgba(0,0,0,0.1)]",
+        "bg-gradient-to-br from-[#ffffff] to-[#f8fafc]",
         className
       )}
     >
-      {/* 頂部細微反光 */}
-      <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
+      {/* 頂部光澤 (::before) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none"></div>
 
-      {/* 內容：花色與數字並排或堆疊 */}
-      <div className="flex flex-col items-center justify-center text-white">
-        <div className="text-[10px] md:text-sm font-bold opacity-90 leading-none mb-1">
-          {config.symbol}
-        </div>
-        <div className="text-xl sm:text-2xl md:text-4xl font-black leading-none select-none tracking-tighter drop-shadow-md">
+      {/* 內容佈局 */}
+      <div className={cn("relative z-10 font-[900] tracking-tighter flex flex-col items-center", config.color)}>
+        <div className="text-xl sm:text-2xl md:text-4xl leading-none select-none">
           {card.rank}
         </div>
       </div>
-      
-      {/* 內陰影裝飾 */}
-      <div className="absolute inset-0 border border-black/10 rounded-lg md:rounded-xl pointer-events-none shadow-inner"></div>
+
+      {/* 右下角微小花色 */}
+      <div className={cn("absolute bottom-1 right-1 opacity-60 font-bold text-[8px] md:text-xs", config.color)}>
+        {config.symbol}
+      </div>
     </div>
   );
 };
