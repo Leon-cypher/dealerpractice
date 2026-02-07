@@ -3,7 +3,18 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # 每次 push 到 main 分支時觸發
+      - main
+
+# 設定權限以允許部署到 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 確保只有一個部署任務在執行
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -23,8 +34,14 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Setup Pages 🌐
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact 📤
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: dist # Vite 編譯後的資料夾名稱
-          branch: gh-pages # 要部署到的分支
+          path: './split-pot-pro/dist' # 注意這裡的路徑
+
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v4
