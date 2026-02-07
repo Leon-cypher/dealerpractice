@@ -190,7 +190,10 @@ export function generateShowdownScenario(playerCount: number = 2, variant: GameV
   const maxHighScore = Math.max(...players.map(p => p.highScore));
   
   // For Hi-Lo (Omaha/BIGO), determine low winners
-  const validLowScores = players.map(p => p.lowScore).filter((score): score is number => score !== null);
+  const validLowScores = players
+    .map(p => p.lowScore)
+    .filter(score => score !== null) as number[];
+    
   const minLowScore = validLowScores.length > 0 ? Math.min(...validLowScores) : null;
 
   return {
