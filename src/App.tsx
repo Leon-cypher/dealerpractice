@@ -42,13 +42,19 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
         className
       )}
     >
-      <div className="absolute top-0.5 left-1 flex flex-col items-center leading-none opacity-80">
-        <span className="text-[8px] sm:text-[10px] md:text-sm font-black text-white">{card.rank}</span>
-        <span className="text-[6px] sm:text-[8px] md:text-xs text-white">{config.symbol}</span>
+      {/* 背景花色水印 */}
+      <div className="absolute -bottom-1 -right-1 text-white/10 text-3xl sm:text-4xl md:text-6xl font-black select-none pointer-events-none">
+        {config.symbol}
       </div>
-      <div className="text-xl sm:text-2xl md:text-4xl font-black text-white drop-shadow-md select-none font-serif">
+      
+      {/* 中央巨大字樣 */}
+      <div className="text-2xl sm:text-3xl md:text-5xl font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] select-none tracking-tighter">
         {card.rank}
       </div>
+      
+      {/* 頂部裝飾線條 */}
+      <div className="absolute top-0 left-0 right-0 h-0.5 md:h-1 bg-white/20"></div>
+      
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
     </div>
   );
