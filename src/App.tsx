@@ -84,6 +84,7 @@ const App: React.FC = () => {
   const [finalScore, setFinalScore] = useState(0);
   const [finalStreak, setFinalStreak] = useState(0);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [minHighScore, setMinHighScore] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRank, setIsLoadingRank] = useState(false);
 
@@ -95,13 +96,25 @@ const App: React.FC = () => {
         .select('*')
         .order('score', { ascending: false })
         .limit(10);
-      if (data) setLeaderboard(data);
+      if (data) {
+        setLeaderboard(data);
+        // 如果滿 10 人，第 10 名的分數就是門檻；如果不滿 10 人，門檻就是 0
+        if (data.length >= 10) {
+          setMinHighScore(data[9].score);
+        } else {
+          setMinHighScore(0);
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoadingRank(false);
     }
   };
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
 
   const handleSubmitScore = async () => {
     if (!playerName.trim()) return;
@@ -148,7 +161,8 @@ const App: React.FC = () => {
         return next;
       });
     } else {
-      if (totalScore > 0) {
+      // 只有分數超過第 10 名門檻，且分數大於 0 時才跳出登錄視窗
+      if (totalScore > 0 && totalScore > minHighScore) {
         setFinalScore(totalScore);
         setFinalStreak(streak);
         setShowSubmitModal(true);
