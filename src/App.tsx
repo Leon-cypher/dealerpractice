@@ -296,8 +296,24 @@ const App: React.FC = () => {
                 </div>
                 {showShowdownResult && (
                   <div className="mt-1 w-full space-y-1">
-                    <div className={cn("text-[8px] md:text-[10px] font-bold p-1 rounded text-center border", player.isHighWinner ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>High: {player.handDescription}</div>
-                    {isHiLo && <div className={cn("text-[8px] md:text-[10px] font-bold p-1 rounded text-center border", player.isLowWinner ? "bg-blue-500/20 text-blue-400 border-blue-500/50" : "bg-white/5 text-slate-500")}>{player.lowDescription}</div>}
+                    <div className={cn(
+                      "text-[8px] md:text-[10px] font-bold p-1 rounded text-center border transition-all", 
+                      player.isHighWinner 
+                        ? "bg-green-500/20 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.2)]" 
+                        : "bg-slate-800/50 text-slate-500 border-slate-700"
+                    )}>
+                      High: {player.handDescription}
+                    </div>
+                    {isHiLo && (
+                      <div className={cn(
+                        "text-[8px] md:text-[10px] font-bold p-1 rounded text-center border transition-all", 
+                        player.isLowWinner 
+                          ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.2)]" 
+                          : "bg-slate-800/50 text-slate-500 border-slate-700"
+                      )}>
+                        {player.lowDescription}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
