@@ -17,44 +17,28 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
     return (
       <div 
         style={style}
-        className={cn("w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 bg-slate-900 border-2 border-slate-700 rounded-lg md:rounded-xl shadow-lg flex items-center justify-center relative", className)}
+        className={cn("poker-card-custom bg-slate-900 border-slate-700", className)}
       >
-        <div className="text-slate-700 font-black text-xl md:text-2xl font-serif">?</div>
+        <div className="text-slate-700 font-black text-xl">?</div>
       </div>
     );
   }
   
-  const suitConfigs: Record<string, { color: string, symbol: string }> = {
-    'spades': { color: 'text-[#1f2937]', symbol: '♠' },
-    'hearts': { color: 'text-[#ef4444]', symbol: '♥' },
-    'diamonds': { color: 'text-[#3b82f6]', symbol: '♦' },
-    'clubs': { color: 'text-[#10b981]', symbol: '♣' }
-  };
-
-  const config = suitConfigs[card.suit];
-
   return (
     <div 
       style={style}
       className={cn(
-        "w-10 h-14 sm:w-12 sm:h-18 md:w-16 md:h-24 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-all border-2 border-[#e5e7eb] shadow-[0_2px_8px_rgba(0,0,0,0.1)]",
-        "bg-gradient-to-br from-[#ffffff] to-[#f8fafc]",
+        "poker-card-custom",
+        card.suit,
         className
       )}
     >
-      {/* 頂部光澤 (::before) */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent pointer-events-none"></div>
-
-      {/* 內容佈局 */}
-      <div className={cn("relative z-10 font-[900] tracking-tighter flex flex-col items-center", config.color)}>
-        <div className="text-xl sm:text-2xl md:text-4xl leading-none select-none">
-          {card.rank}
-        </div>
-      </div>
-
-      {/* 右下角微小花色 */}
-      <div className={cn("absolute bottom-1 right-1 opacity-60 font-bold text-[8px] md:text-xs", config.color)}>
-        {config.symbol}
+      <div className="poker-card-rank">{card.rank}</div>
+      <div className="poker-card-suit">
+        {card.suit === 'spades' && '♠'}
+        {card.suit === 'hearts' && '♥'}
+        {card.suit === 'diamonds' && '♦'}
+        {card.suit === 'clubs' && '♣'}
       </div>
     </div>
   );

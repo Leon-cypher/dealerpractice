@@ -3,5 +3,74 @@
 @tailwind utilities;
 
 :root {
-  background-color: #1a4731;
+  --poker-green: #0a2d1d;
+  --poker-gold: #c9a050;
+}
+
+body {
+  margin: 0;
+  background-color: var(--poker-green);
+  color: white;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 複製自 omaha_hilo_calculator 的原始 CSS */
+.poker-card-custom {
+    width: 45px;
+    height: 62px;
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    color: inherit;
+}
+
+.poker-card-custom::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.3), transparent);
+    pointer-events: none;
+}
+
+.poker-card-custom.spades { color: #1f2937 !important; }
+.poker-card-custom.hearts { color: #ef4444 !important; }
+.poker-card-custom.diamonds { color: #3b82f6 !important; }
+.poker-card-custom.clubs { color: #10b981 !important; }
+
+.poker-card-rank {
+    font-size: 1.2rem;
+    line-height: 1;
+    z-index: 10;
+}
+
+.poker-card-suit {
+    font-size: 0.7rem;
+    margin-top: 2px;
+    z-index: 10;
+}
+
+/* 針對行動裝置微調尺寸，保持比例 */
+@media (max-width: 640px) {
+  .poker-card-custom {
+    width: 35px;
+    height: 48px;
+    font-size: 11px;
+  }
+  .poker-card-rank {
+    font-size: 0.9rem;
+  }
 }
