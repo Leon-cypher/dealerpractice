@@ -241,7 +241,19 @@ const App: React.FC = () => {
                   ) : (
                     <div className="space-y-3">
                       <div className={cn("p-3 md:p-4 rounded-xl md:rounded-2xl text-center font-black border-2 text-xs md:text-sm uppercase", allPayoutsCorrect ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>{allPayoutsCorrect ? "分配成功" : "分配失敗"}</div>
-                      <button onClick={initSplitPot} className="w-full bg-white/10 text-white font-black py-4 md:py-5 rounded-xl md:rounded-2xl hover:bg-white/20 transition-all uppercase tracking-widest text-xs">下一題練習</button>
+                      {!allPayoutsCorrect && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => setShowPotResult(false)} className="bg-white/5 text-slate-400 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all border border-white/10">重新輸入</button>
+                          <button onClick={() => {
+                            const answers: Record<number, string> = {};
+                            potPlayers.forEach(p => {
+                              answers[p.id] = correctPayouts[p.id].toString();
+                            });
+                            setPayoutAnswers(answers);
+                          }} className="bg-blue-600/20 text-blue-400 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600/30 transition-all border border-blue-600/30">顯示解答</button>
+                        </div>
+                      )}
+                      <button onClick={initSplitPot} className="w-full bg-white/10 text-white font-black py-4 md:py-5 rounded-xl md:rounded-2xl hover:bg-white/20 transition-all uppercase tracking-widest text-xs">{allPayoutsCorrect ? "下一題練習" : "放棄並換題"}</button>
                     </div>
                   )}
                 </div>
