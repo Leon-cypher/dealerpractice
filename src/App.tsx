@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
 import { createClient } from '@supabase/supabase-js';
+// @ts-ignore
+import svgCards from 'svg-cards/svg-cards.svg';
 import { Trophy, RefreshCw, CheckCircle2, XCircle, Info, Users, Coins, ArrowRight, Wallet, Medal, Eye, Calculator, Star, Flame, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -18,72 +20,39 @@ function cn(...inputs: ClassValue[]) {
 type MainMode = 'SPLIT_POT' | 'SHOWDOWN';
 
 // --- Card Component ---
-// --- SVG Suit Icons ---
-const SuitIcon: React.FC<{ suit: string; className?: string }> = ({ suit, className }) => {
-  switch (suit) {
-    case 'spades':
-      return (
-        <svg viewBox="0 0 1024 1024" className={className} fill="currentColor">
-          <path d="M512 64C335.3 64 192 207.3 192 384c0 103.8 49.3 196.1 125.1 254.4-44.1 33.3-93.1 82.2-93.1 161.6 0 26.5 21.5 48 48 48h480c26.5 0 48-21.5 48-48 0-79.4-49-128.3-93.1-161.6C782.7 580.1 832 487.8 832 384 832 207.3 688.7 64 512 64z" />
-        </svg>
-      );
-    case 'hearts':
-      return (
-        <svg viewBox="0 0 1024 1024" className={className} fill="currentColor">
-          <path d="M923 283.6c-13.4-31.1-32.6-58.9-56.9-82.8-24.3-23.8-52.5-42.4-84-55.5-32.5-13.5-66.9-20.3-102.4-20.3-49.3 0-97.4 13.5-139.2 39-10 6.1-19.5 12.8-28.5 20.1-9-7.3-18.5-14-28.5-20.1-41.8-25.5-89.9-39-139.2-39-35.5 0-69.9 6.8-102.4 20.3-31.4 13-59.7 31.7-84 55.5-24.4 23.9-43.5 51.7-56.9 82.8-13.9 32.3-21 66.6-21 101.9 0 33.3 6.8 68 20.3 103.3 11.3 29.5 27.5 60.1 48.2 91 32.8 48.9 77.9 99.9 133.9 151.6 92.8 85.7 184.7 144.9 188.6 147.3l23.7 15.2c10.5 6.7 24 6.7 34.5 0l23.7-15.2c3.9-2.5 95.7-61.6 188.6-147.3 56-51.7 101.1-102.7 133.9-151.6 20.7-30.9 37-61.5 48.2-91 13.5-35.3 20.3-70 20.3-103.3 0.1-35.3-7-69.6-20.9-101.9z" />
-        </svg>
-      );
-    case 'diamonds':
-      return (
-        <svg viewBox="0 0 1024 1024" className={className} fill="currentColor">
-          <path d="M512 64L128 512l384 448 384-448L512 64z" />
-        </svg>
-      );
-    case 'clubs':
-      return (
-        <svg viewBox="0 0 1024 1024" className={className} fill="currentColor">
-          <path d="M896 512c0-70.7-57.3-128-128-128-26.1 0-50.4 7.8-70.7 21.2C685.2 315.6 605.1 256 512 256s-173.2 59.6-185.3 149.2C306.4 391.8 282.1 384 256 384c-70.7 0-128 57.3-128 128s57.3 128 128 128c26.1 0 50.4-7.8 70.7-21.2C338.8 708.4 418.9 768 512 768s173.2-59.6 185.3-149.2c20.3 13.4 44.6 21.2 70.7 21.2 70.7 0 128-57.3 128-128zM512 192c44.2 0 80-35.8 80-80s-35.8-80-80-80-80 35.8-80 80 35.8 80 80 80z" />
-        </svg>
-      );
-    default:
-      return null;
-  }
-};
-
 const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?: string; style?: React.CSSProperties; mini?: boolean }> = ({ card, hidden, className, style, mini }) => {
   if (hidden) {
     return (
       <div 
         style={style}
-        className={cn("poker-card bg-slate-900 border-slate-700", className)}
+        className={cn("bg-slate-900 border-2 border-slate-700 rounded-lg flex items-center justify-center", mini ? "w-8 h-12" : "w-16 h-24", className)}
       >
         <div className="text-slate-700 font-black text-xl">?</div>
       </div>
     );
   }
 
-  const suitSymbol = {
-    'spades': '♠',
-    'hearts': '♥',
-    'diamonds': '♦',
-    'clubs': '♣'
-  }[card.suit];
+  // 將 rank 與 suit 轉換為 svg-cards 的 ID 格式
+  // 規則: spades A -> spade_A, hearts 10 -> heart_10
+  const suitName = card.suit.slice(0, -1); // spades -> spade
+  const rankName = card.rank === 'T' ? '10' : card.rank;
+  const cardId = `${suitName}_${rankName}`;
   
   return (
     <div 
       style={style}
       className={cn(
-        mini ? "mini-card" : "poker-card",
-        card.suit,
+        "relative transition-all select-none flex items-center justify-center overflow-visible",
+        mini ? "w-10 h-14 md:w-12 md:h-16" : "w-16 h-22 md:w-24 md:h-32",
         className
       )}
     >
-      <div className={cn("flex flex-col items-center justify-center", mini ? "flex-row gap-0.5" : "gap-0.5")}>
-        <div className={cn("font-black leading-none select-none", mini ? "text-base" : "text-2xl md:text-3xl")}>
-          {card.rank}
-        </div>
-        <SuitIcon suit={card.suit} className={cn(mini ? "w-3 h-3" : "w-6 h-6 md:w-8 md:h-8")} />
-      </div>
+      <svg 
+        viewBox="0 0 169.075 244.64" 
+        className="w-full h-full drop-shadow-xl hover:scale-105 transition-transform"
+      >
+        <use xlinkHref={`${svgCards}#${cardId}`} />
+      </svg>
     </div>
   );
 };
