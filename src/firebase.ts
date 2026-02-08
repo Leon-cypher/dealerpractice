@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence, inMemoryPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -21,5 +21,26 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// 嘗試設定持久性，如果失敗則使用記憶體模式
+const initializePersistence = async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (error) {
+    console.warn("localStorage not available, falling back to memory persistence:", error);
+    try {
+      await setPersistence(auth, inMemoryPersistence);
+    } catch (fallbackError) {
+      console.error("Failed to set any persistence:", fallbackError);
+    }
+  }
+};
+
+initializePersistence();
+
+// 設定 Google Provider 參數
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export default app;

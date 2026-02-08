@@ -10,6 +10,8 @@ import logo from './assets/logo.png';
 import { auth, db, googleProvider } from './firebase';
 import { 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   User as FirebaseUser 
@@ -106,6 +108,7 @@ const App: React.FC = () => {
   const [challengeTimeLeft, setChallengeTimeLeft] = useState(300);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRankModal, setShowRankModal] = useState(false);
+  const [showInAppBrowserWarning, setShowInAppBrowserWarning] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [activeRankTab, setActiveRankTab] = useState<LeaderboardType>('SPLIT_POT');
   const [finalScore, setFinalScore] = useState(0);
@@ -116,11 +119,84 @@ const App: React.FC = () => {
   const [isLoadingRank, setIsLoadingRank] = useState(false);
 
   // --- Auth Handlers ---
+  const isInAppBrowser = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    return (
+      ua.includes('line') ||
+      ua.includes('fbav') ||
+      ua.includes('fban') ||
+      ua.includes('instagram') ||
+      ua.includes('twitter') ||
+      ua.includes('micromessenger') ||
+      ua.includes('whatsapp')
+    );
+  };
+
+  const isSafariOrPrivateBrowser = () => {
+    const ua = navigator.userAgent.toLowerCase();
+    
+    // 偵測 Safari（但不是 Chrome）
+    const isSafari = ua.includes('safari') && !ua.includes('chrome') && !ua.includes('crios') && !ua.includes('fxios');
+    
+    // 偵測 Firefox
+    const isFirefox = ua.includes('firefox');
+    
+    // 偵測 Brave
+    const isBrave = !!(navigator as any).brave;
+    
+    return isSafari || isFirefox || isBrave || isInAppBrowser();
+  };
+
   const handleGoogleLogin = async () => {
+    // 如果是社群媒體內建瀏覽器，先顯示提示
+    if (isInAppBrowser()) {
+      setShowInAppBrowserWarning(true);
+      return;
+    }
+
     try {
+      // Safari、Firefox、Brave 直接使用 redirect
+      if (isSafariOrPrivateBrowser()) {
+        console.log("Detected privacy-focused browser, using redirect login");
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      
+      // 其他瀏覽器優先使用 popup
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
+    } catch (error: any) {
+      console.error("Popup login failed:", error);
+      
+      // 如果是 popup 相關錯誤，嘗試使用 redirect
+      if (
+        error.code === 'auth/popup-blocked' || 
+        error.code === 'auth/popup-closed-by-user' ||
+        error.message?.includes('sessionStorage') ||
+        error.message?.includes('popup')
+      ) {
+        try {
+          console.log("Falling back to redirect login...");
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError: any) {
+          console.error("Redirect login failed:", redirectError);
+          alert('登入失敗。請嘗試：\n1. 使用外部瀏覽器開啟\n2. 允許 Cookies\n3. 關閉隱私保護模式');
+        }
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // 使用者取消，不顯示錯誤
+      } else {
+        alert(`登入失敗：${error.message || '未知錯誤'}`);
+      }
+    }
+  };
+
+  const proceedWithInAppLogin = async () => {
+    setShowInAppBrowserWarning(false);
+    try {
+      console.log("User chose to proceed with in-app browser login");
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error: any) {
+      console.error("In-app browser login failed:", error);
+      alert('登入失敗。建議使用外部瀏覽器開啟此網站以獲得最佳體驗。');
     }
   };
 
@@ -147,6 +223,19 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // 檢查 redirect 登入結果
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) {
+        console.log("Redirect login successful");
+      }
+    }).catch((error) => {
+      console.error("Redirect result error:", error);
+      if (!error.message?.includes('no redirect operation')) {
+        alert('登入過程發生錯誤，請重試');
+      }
+    });
+
+    // 監聽認證狀態變化
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) fetchProfile(firebaseUser.uid);
@@ -230,7 +319,7 @@ const App: React.FC = () => {
   }, [variant]);
 
   const initQuiz = useCallback(() => {
-    setQuizQuestions(QuizLogic.getRandomQuestions(50));
+    setQuizQuestions(QuizLogic.getRandomQuestions(110)); // 載入全部 110 題
     setCurrentQuizIdx(0); setSelectedQuizOption(null); setShowQuizResult(false); setStartTime(Date.now());
   }, []);
 
@@ -658,6 +747,78 @@ const App: React.FC = () => {
 
         <footer className="mt-20 text-center text-slate-500 text-[10px] border-t border-white/5 pt-8 uppercase tracking-[0.2em] opacity-50">Leon-lab Training Utility • 2026</footer>
       </div>
+
+      {/* --- In-App Browser Warning Modal --- */}
+      {showInAppBrowserWarning && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[4000] p-4">
+          <div className="bg-slate-900 border-2 border-red-500 p-6 md:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <XCircle className="w-10 h-10 text-red-400" />
+              </div>
+              <h2 className="text-2xl font-black text-white mb-3">無法在此環境登入</h2>
+              <p className="text-slate-300 text-sm leading-relaxed mb-4">
+                偵測到您正在使用 App 內建瀏覽器（如 LINE、Facebook 等）。
+                根據 <span className="text-red-400 font-bold">Google 安全政策</span>，
+                此環境不支援 Google 登入。
+              </p>
+            </div>
+            
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-red-200">
+                  <p className="font-bold mb-1">Google 安全限制：</p>
+                  <p>為了保護您的帳號安全，Google 不允許在內建瀏覽器中進行登入。這是無法繞過的安全機制。</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 mb-6 text-left">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-200 space-y-2">
+                  <p className="font-bold">請使用外部瀏覽器開啟：</p>
+                  <ol className="list-decimal list-inside space-y-1 text-blue-300">
+                    <li><span className="font-bold">LINE</span>：點選右上角「•••」→「在其他瀏覽器開啟」</li>
+                    <li><span className="font-bold">Facebook/IG</span>：點選右上角「⋯」→「在瀏覽器開啟」</li>
+                    <li><span className="font-bold">或直接複製網址</span>：到 Chrome/Safari 開啟</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => {
+                  // 複製網址到剪貼簿
+                  navigator.clipboard.writeText(window.location.href).then(() => {
+                    alert('✅ 網址已複製！\n請貼到 Chrome、Safari 或 Edge 開啟。');
+                  }).catch(() => {
+                    alert('請手動複製網址：\n' + window.location.href);
+                  });
+                }}
+                className="w-full bg-blue-500 text-white py-4 rounded-xl font-bold hover:bg-blue-600 transition-all shadow-lg flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                複製網址（推薦）
+              </button>
+              <button 
+                onClick={() => setShowInAppBrowserWarning(false)}
+                className="w-full bg-white/10 text-white py-4 rounded-xl font-bold hover:bg-white/20 transition-all border border-white/10"
+              >
+                關閉
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-4">
+              網址：<span className="text-blue-400 font-mono break-all">{window.location.hostname}</span>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
