@@ -50,11 +50,15 @@ export function calculatePayouts(players: Player[], pots: PotStage[]): Record<nu
   pots.forEach(pot => {
     const eligiblePlayers = players.filter(p => pot.eligiblePlayerIds.includes(p.id));
     const bestRank = Math.min(...eligiblePlayers.map(p => p.rank));
-    const winners = eligiblePlayers.filter(p => p.rank === bestRank);
+    const winners = eligiblePlayers.filter(p => p.rank === bestRank)
+      .sort((a, b) => a.id - b.id); // 排序 ID 以決定零錢分配順序
     
     const winAmount = Math.floor(pot.amount / winners.length);
-    winners.forEach(w => {
-      payouts[w.id] += winAmount;
+    const remainder = pot.amount % winners.length;
+    
+    winners.forEach((w, index) => {
+      // 餘數由 index 較小（ID 較小）的贏家先拿 1 元
+      payouts[w.id] += winAmount + (index < remainder ? 1 : 0);
     });
   });
 

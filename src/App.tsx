@@ -53,6 +53,24 @@ const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?:
   );
 };
 
+interface ShowdownPlayer {
+  id: number;
+  name: string;
+  cards: PokerLogic.Card[];
+  highScore: number;
+  lowScore: number | null;
+  handDescription: string;
+  lowDescription: string;
+  isHighWinner: boolean;
+  isLowWinner: boolean;
+}
+
+interface ShowdownScenario {
+  variant: PokerLogic.GameVariant;
+  communityCards: PokerLogic.Card[];
+  players: ShowdownPlayer[];
+}
+
 const App: React.FC = () => {
   const [mode, setMode] = useState<MainMode>('SPLIT_POT');
   const [variant, setVariant] = useState<PokerLogic.GameVariant>('HOLDEM');
@@ -67,7 +85,7 @@ const App: React.FC = () => {
   const [correctPots, setCorrectPots] = useState<PotCalc.PotStage[]>([]);
   const [correctPayouts, setCorrectPayouts] = useState<Record<number, number>>({});
 
-  const [showdown, setShowdown] = useState<any>(null);
+  const [showdown, setShowdown] = useState<ShowdownScenario | null>(null);
   const [userHighWinnerIds, setUserHighWinnerIds] = useState<number[]>([]);
   const [userLowWinnerIds, setUserLowWinnerIds] = useState<number[]>([]);
   const [showShowdownResult, setShowShowdownResult] = useState(false);
@@ -322,6 +340,15 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-4 md:space-y-6">
+                  {stage === 'PAYOUTS' && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex gap-3 items-start">
+                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                      <div className="text-[10px] text-blue-300 leading-relaxed">
+                        <span className="font-bold text-blue-400 block mb-1">專業荷官小撇步：</span>
+                        若底池無法整除，多出的零錢 (Odd Chips) 應由<b>按鈕位 (Button) 順時針方向第一位</b>贏家獲得。在此練習中，請分給 ID 較小的贏家。
+                      </div>
+                    </div>
+                  )}
                   {potPlayers.map((p) => (
                     <div key={p.id} className="relative">
                       <label className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">{p.name} 獲配總額</label>
@@ -394,26 +421,32 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex gap-2 w-full">
-                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(player.id) ? prev.filter(x => x !== player.id) : [...prev, player.id])} className={cn("flex-1 py-1.5 md:py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition-all", userHighWinnerIds.includes(player.id) ? "bg-poker-gold text-poker-green" : "bg-white/10 text-slate-400")}>高牌贏家</button>
+                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(player.id) ? prev.filter(x => x !== player.id) : [...prev, player.id])} className={cn("flex-1 py-1.5 md:py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition-all", userHighWinnerIds.includes(player.id) ? "bg-poker-gold text-poker-green" : "bg-white/10 text-slate-400")}>
+                    {isHiLo ? "高牌贏家" : "贏家"}
+                  </button>
                   {isHiLo && <button onClick={() => !showShowdownResult && setUserLowWinnerIds(prev => prev.includes(player.id) ? prev.filter(x => x !== player.id) : [...prev, player.id])} className={cn("flex-1 py-1.5 md:py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition-all", userLowWinnerIds.includes(player.id) ? "bg-blue-500 text-white shadow-lg" : "bg-white/10 text-slate-400")}>低牌贏家</button>}
                 </div>
                 {showShowdownResult && (
-                  <div className="mt-1 w-full space-y-1">
+                  <div className="mt-2 w-full space-y-2">
                     <div className={cn(
-                      "text-[8px] md:text-[10px] font-bold p-1 rounded text-center border transition-all", 
+                      "text-[10px] font-bold p-2 rounded text-center border transition-all", 
                       player.isHighWinner 
-                        ? "bg-green-500/20 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.2)]" 
+                        ? "bg-green-500/20 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]" 
                         : "bg-slate-800/50 text-slate-500 border-slate-700"
                     )}>
-                      High: {player.handDescription}
+                      <div className="text-[8px] uppercase opacity-60 mb-0.5">
+                        {isHiLo ? "最佳高牌組合" : "最佳組合"}
+                      </div>
+                      {player.handDescription}
                     </div>
                     {isHiLo && (
                       <div className={cn(
-                        "text-[8px] md:text-[10px] font-bold p-1 rounded text-center border transition-all", 
+                        "text-[10px] font-bold p-2 rounded text-center border transition-all", 
                         player.isLowWinner 
-                          ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.2)]" 
+                          ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.3)]" 
                           : "bg-slate-800/50 text-slate-500 border-slate-700"
                       )}>
+                        <div className="text-[8px] uppercase opacity-60 mb-0.5">最佳低牌組合 (8-or-better)</div>
                         {player.lowDescription}
                       </div>
                     )}
@@ -482,6 +515,60 @@ const App: React.FC = () => {
               {(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (
                 <button key={v} onClick={() => {setVariant(v); setStreak(0);}} className={cn("flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold transition-all whitespace-nowrap", variant === v ? "bg-white/20 text-white" : "text-slate-500")}>{v}</button>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* --- 功能說明導引 --- */}
+        <div className="max-w-4xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-700">
+          {mode === 'SPLIT_POT' ? (
+            <div className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-2xl flex gap-4 md:gap-6 items-center">
+              <div className="hidden sm:flex bg-poker-gold/20 p-4 rounded-2xl items-center justify-center">
+                <Calculator className="w-8 h-8 text-poker-gold" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-poker-gold font-black text-sm md:text-base flex items-center gap-2 uppercase tracking-wider">
+                  <Calculator className="w-4 h-4 sm:hidden" /> 底池分配練習 (Split Pot)
+                </h3>
+                <p className="text-xs md:text-sm text-slate-400 leading-relaxed">
+                  模擬多位玩家 All-in 的複雜情境。你的任務是：
+                  <span className="block mt-1">1. <b>核算底池</b>：計算主池 (Main Pot) 與各個邊池 (Side Pot) 的正確金額。</span>
+                  <span className="block">2. <b>分配籌碼</b>：根據玩家的勝負排名，將底池準確分配給贏家。注意餘數 (Odd Chips) 的處理規則。</span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-2xl flex gap-4 md:gap-6 items-center">
+              <div className="hidden sm:flex bg-blue-500/20 p-4 rounded-2xl items-center justify-center">
+                <Eye className="w-8 h-8 text-blue-400" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-blue-400 font-black text-sm md:text-base flex items-center gap-2 uppercase tracking-wider">
+                  <Eye className="w-4 h-4 sm:hidden" /> 勝負判斷練習 (Showdown)
+                </h3>
+                <p className="text-xs md:text-sm text-slate-400 leading-relaxed">
+                  鍛鍊辨識牌型與判斷贏家的速度。
+                  <span className="block mt-1">1. <b>觀察牌組</b>：結合 5 張公牌與玩家手牌，找出最強組合。</span>
+                  <span className="block">2. <b>標記贏家</b>：點擊玩家下方的按鈕標記高牌贏家。</span>
+                  
+                  {/* 動態規則提示 */}
+                  <span className="block mt-3 p-2 bg-blue-500/10 border-l-2 border-blue-500 text-[10px] md:text-xs">
+                    {variant === 'HOLDEM' && (
+                      <span className="text-blue-300"><b>德州撲克規則：</b>可從 2 張手牌與 5 張公牌中，任意挑選 5 張組成最強牌型。</span>
+                    )}
+                    {variant === 'OMAHA' && (
+                      <span className="text-blue-300"><b>奧馬哈規則：</b><b className="text-white underline">強制 2+3</b>。必須且只能從 4 張手牌中選 2 張，搭配公牌中的 3 張組成牌型。</span>
+                    )}
+                    {variant === 'BIGO' && (
+                      <span className="text-blue-300">
+                        <b>BIGO (5-Card Hi-Lo) 規則：</b>
+                        <br />• <b>高牌：</b><b className="text-white underline">強制 2+3</b>。從 5 張手牌選 2 張，搭配 3 張公牌。
+                        <br />• <b>低牌 (Low)：</b>需有 5 張不重複且 <b>8 或以下</b>的牌。A 算 1。若多人符合，數字最小者贏。
+                      </span>
+                    )}
+                  </span>
+                </p>
+              </div>
             </div>
           )}
         </div>
