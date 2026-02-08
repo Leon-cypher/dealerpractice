@@ -1,0 +1,12 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /avatars/{userId}/{allPaths=**} {
+      // 允許所有人查看頭像
+      allow read: if true;
+      // 僅允許登入使用者上傳自己的頭像
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

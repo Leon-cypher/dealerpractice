@@ -125,7 +125,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ userId, onUploadSuccess, cu
             <button onClick={() => setImage(null)} className="flex-1 py-4 bg-white/5 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-white/10">
               <X className="w-5 h-5" /> 取消
             </button>
-            <button onClick={handleUpload} disabled={isUploading} className="flex-1 py-4 bg-brand-gold text-brand-green rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 disabled:opacity-50">
+            <button onClick={handleUpload} disabled={isUploading} className="flex-1 py-4 bg-yellow-400 text-slate-900 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
               {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Check className="w-5 h-5" /> 確定裁切</>}
             </button>
           </div>

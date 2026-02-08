@@ -2,17 +2,29 @@ rules_version='2'
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 3, 11);
+    
+    // 使用者個人資料
+    match /profiles/{userId} {
+      // 所有人可以讀取個人資料
+      allow read: if true;
+      // 只有本人可以建立和更新自己的資料
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      // 不允許刪除
+      allow delete: if false;
+    }
+    
+    // 排行榜
+    match /leaderboard/{entryId} {
+      // 所有人可以讀取排行榜
+      allow read: if true;
+      // 只有登入的使用者可以新增成績
+      allow create: if request.auth != null 
+                    && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.name is string
+                    && request.resource.data.score is number
+                    && request.resource.data.type is string;
+      // 不允許更新和刪除排行榜記錄
+      allow update, delete: if false;
     }
   }
 }

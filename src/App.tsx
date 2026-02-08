@@ -56,14 +56,14 @@ interface LeaderboardEntry {
   type: LeaderboardType;
   created_at: any;
   user_id?: string;
-  avatar_url?: string; // Firebase 中我們直接存入頭像網址以簡化查詢
+  avatar_url?: string;
 }
 
 // --- Card Component ---
 const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?: string; style?: React.CSSProperties; mini?: boolean }> = ({ card, hidden, className, style, mini }) => {
   if (hidden) return (<div style={style} className={cn("poker-card bg-slate-900 border-slate-700", className)}><div className="text-slate-700 font-black text-xl">?</div></div>);
   const suitSymbol = { 'spades': '♠', 'hearts': '♥', 'diamonds': '♦', 'clubs': '♣' }[card.suit];
-  return (<div style={style} className={cn(mini ? "mini-card" : "poker-card", card.suit, className)}><div className={mini ? "" : "text-lg md:text-xl"}>{card.rank}</div>{!mini && <div className="text-[10px] md:text-xs opacity-80">{suitSymbol}</div>}{mini && <span className="ml-0.5">{suitSymbol}</span>}</div>);
+  return (<div style={style} className={cn(mini ? "mini-card" : "poker-card", card.suit, className)}><div className={mini ? "text-sm" : "text-lg md:text-xl"}>{card.rank}</div>{!mini && <div className="text-xs md:text-sm opacity-80">{suitSymbol}</div>}{mini && <span className="ml-0.5">{suitSymbol}</span>}</div>);
 };
 
 interface ShowdownPlayer { id: number; name: string; cards: PokerLogic.Card[]; highScore: number; lowScore: number | null; handDescription: string; lowDescription: string; isHighWinner: boolean; isLowWinner: boolean; }
@@ -106,8 +106,8 @@ const App: React.FC = () => {
   const [challengeTimeLeft, setChallengeTimeLeft] = useState(300);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRankModal, setShowRankModal] = useState(false);
-  const [activeRankTab, setActiveRankTab] = useState<LeaderboardType>('SPLIT_POT');
   const [playerName, setPlayerName] = useState("");
+  const [activeRankTab, setActiveRankTab] = useState<LeaderboardType>('SPLIT_POT');
   const [finalScore, setFinalScore] = useState(0);
   const [finalStreak, setFinalStreak] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -149,7 +149,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) fetchProfile(firebaseUser.id);
+      if (firebaseUser) fetchProfile(firebaseUser.uid);
     });
     return () => unsubscribe();
   }, []);
@@ -158,15 +158,15 @@ const App: React.FC = () => {
     if (!user) return;
     setIsUpdatingProfile(true);
     try {
-      const docRef = doc(db, "profiles", user.id);
+      const docRef = doc(db, "profiles", user.uid);
       await setDoc(docRef, {
-        id: user.id,
+        id: user.uid,
         nickname,
         avatar_url: avatarUrl,
         updated_at: serverTimestamp(),
       }, { merge: true });
       
-      setProfile({ id: user.id, nickname, avatar_url: avatarUrl });
+      setProfile({ id: user.uid, nickname, avatar_url: avatarUrl });
       setShowProfileModal(false);
     } catch (err: any) {
       console.error("Error saving profile:", err);
@@ -291,7 +291,7 @@ const App: React.FC = () => {
   };
 
   const handleSubmitScore = async () => {
-    if (isSubmitting || !profile?.nickname) return;
+    if (isSubmitting || !profile?.nickname || !user) return;
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, "leaderboard"), {
@@ -300,7 +300,7 @@ const App: React.FC = () => {
         streak: finalStreak, 
         type: currentType,
         user_id: user.uid,
-        avatar_url: profile.avatar_url, // Firebase 中我們直接存入頭像網址以簡化排行榜查詢
+        avatar_url: profile.avatar_url, 
         created_at: serverTimestamp()
       });
       setShowSubmitModal(false); 
@@ -355,10 +355,10 @@ const App: React.FC = () => {
               </>
             )}
             {!showPotResult ? (
-              <button onClick={() => {setShowPotResult(true); updateStreak(stage === 'POTS' ? allPotsCorrect : allPayoutsCorrect, stage === 'POTS' ? 500 : 1000);}} className="w-full bg-brand-gold text-brand-green font-black py-5 rounded-2xl uppercase shadow-xl hover:bg-yellow-500 transition-all active:scale-95">核對結果</button>
+              <button onClick={() => {setShowPotResult(true); updateStreak(stage === 'POTS' ? allPotsCorrect : allPayoutsCorrect, stage === 'POTS' ? 500 : 1000);}} className="w-full bg-yellow-400 text-slate-900 font-black py-5 rounded-2xl uppercase shadow-xl hover:bg-yellow-300 transition-all active:scale-95">核對結果</button>
             ) : (
               <div className="space-y-3">
-                {(stage === 'POTS' && allPotsCorrect) && <button onClick={() => {setStage('PAYOUTS'); setShowPotResult(false);}} className="w-full bg-white text-brand-green font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:bg-slate-100 transition-all">進入分配階段 <ArrowRight className="w-4 h-4" /></button>}
+                {(stage === 'POTS' && allPotsCorrect) && <button onClick={() => {setStage('PAYOUTS'); setShowPotResult(false);}} className="w-full bg-white text-slate-900 font-black py-5 rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:bg-slate-100 transition-all">進入分配階段 <ArrowRight className="w-4 h-4" /></button>}
                 <button onClick={initSplitPot} className="w-full bg-white/10 text-white font-black py-5 rounded-2xl hover:bg-white/20 transition-all">{allPayoutsCorrect ? "下一題練習" : "放棄並換題"}</button>
               </div>
             )}
@@ -384,8 +384,8 @@ const App: React.FC = () => {
                 <div className="font-bold text-white">{p.name}</div>
                 <div className="flex gap-1 flex-wrap justify-center">{p.cards.map((card, i) => (<PokerCard key={i} card={card} mini />))}</div>
                 <div className="flex gap-2 w-full">
-                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all", userHighWinnerIds.includes(p.id) ? "bg-brand-gold text-brand-green shadow-lg" : "bg-white/10 text-slate-400 hover:bg-white/20")}>{isHiLo ? "高牌贏家" : "贏家"}</button>
-                  {isHiLo && <button onClick={() => !showShowdownResult && setUserLowWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all", userLowWinnerIds.includes(p.id) ? "bg-blue-500 text-white shadow-lg" : "bg-white/10 text-slate-400 hover:bg-white/20")}>低牌贏家</button>}
+                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all", userHighWinnerIds.includes(p.id) ? "bg-yellow-400 text-slate-900 shadow-lg" : "bg-white/10 text-slate-300 hover:bg-white/20")}>{isHiLo ? "高牌贏家" : "贏家"}</button>
+                  {isHiLo && <button onClick={() => !showShowdownResult && setUserLowWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all", userLowWinnerIds.includes(p.id) ? "bg-blue-500 text-white shadow-lg" : "bg-white/10 text-slate-300 hover:bg-white/20")}>低牌贏家</button>}
                 </div>
                 {showShowdownResult && (
                   <div className="mt-2 w-full space-y-2 text-center animate-in slide-in-from-top-2">
@@ -398,8 +398,8 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="max-w-md mx-auto space-y-4">
-          {!showShowdownResult ? (<button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect, 800);}} className="w-full bg-brand-gold text-brand-green font-black py-4 rounded-xl uppercase shadow-xl hover:bg-yellow-500 transition-all active:scale-95">確認分配結果</button>) : (
-            <div className="space-y-3"><div className={cn("p-4 rounded-xl font-bold text-center border-2 text-lg animate-in zoom-in", isCorrect ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>{isCorrect ? "判斷正確！" : "判斷錯誤。"}</div><button onClick={initShowdown} className="w-full bg-white text-brand-green font-black py-4 rounded-xl shadow-lg hover:bg-slate-100 transition-all">下一題練習</button></div>
+          {!showShowdownResult ? (<button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect, 800);}} className="w-full bg-yellow-400 text-slate-900 font-black py-4 rounded-xl uppercase shadow-xl hover:bg-yellow-300 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">確認分配結果</button>) : (
+            <div className="space-y-3"><div className={cn("p-4 rounded-xl font-bold text-center border-2 text-lg animate-in zoom-in", isCorrect ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>{isCorrect ? "判斷正確！" : "判斷錯誤。"}</div><button onClick={initShowdown} className="w-full bg-white text-slate-900 font-black py-4 rounded-xl shadow-lg hover:bg-slate-100 transition-all">下一題練習</button></div>
           )}
         </div>
       </div>
@@ -448,55 +448,66 @@ const App: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
           <div className="flex items-center gap-2 md:gap-3 bg-black/40 px-4 md:px-6 py-2.5 md:py-3 rounded-2xl border border-white/10 shadow-lg w-full sm:w-auto justify-between sm:justify-start">
             {isChallengeActive && (
-              <div className="flex flex-col items-center border-r border-white/20 pr-2 md:pr-4">
-                <span className="text-[7px] md:text-[8px] text-red-400 font-bold uppercase animate-pulse">Time Left</span>
-                <div className="text-lg md:text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div>
+              <div className="flex flex-col items-center border-r border-white/20 pr-3 md:pr-4">
+                <span className="text-[9px] md:text-[10px] text-red-400 font-bold uppercase animate-pulse">Time Left</span>
+                <div className="text-xl md:text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div>
               </div>
             )}
-            <div className="flex flex-col items-center border-r border-white/20 px-2 md:px-4 relative">
-              <span className="text-[7px] md:text-[8px] text-brand-gold font-bold uppercase tracking-widest">Points</span>
-              <div className="flex items-center gap-1 text-brand-gold"><Coins className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="text-lg md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
-              {lastPoints > 0 && <div className="text-[7px] md:text-[8px] text-green-400 font-bold animate-bounce absolute -top-4">+{lastPoints}</div>}
+            <div className="flex flex-col items-center border-r border-white/20 px-3 md:px-4 relative">
+              <span className="text-[9px] md:text-[10px] text-brand-gold font-bold uppercase tracking-widest">Points</span>
+              <div className="flex items-center gap-1 text-brand-gold"><Coins className="w-4 h-4 md:w-5 md:h-5" /><span className="text-xl md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
+              {lastPoints > 0 && <div className="text-[9px] md:text-[10px] text-green-400 font-bold animate-bounce absolute -top-4">+{lastPoints}</div>}
             </div>
-            <div className="flex flex-col items-center px-2 md:px-4">
-              <span className="text-[7px] md:text-[8px] text-brand-gold font-bold uppercase tracking-widest">Streak</span>
-              <div className="flex items-center gap-1"><Flame className={cn("w-4 h-4 md:w-5 md:h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-lg md:text-2xl font-black">{streak}</span></div>
+            <div className="flex flex-col items-center px-3 md:px-4">
+              <span className="text-[9px] md:text-[10px] text-brand-gold font-bold uppercase tracking-widest">Streak</span>
+              <div className="flex items-center gap-1"><Flame className={cn("w-4 h-4 md:w-5 md:h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-xl md:text-2xl font-black">{streak}</span></div>
             </div>
           </div>
-          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-            <h1 className="text-xl md:text-2xl font-black text-brand-gold flex items-center gap-3 drop-shadow-md">
-              <img src={logo} alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain pointer-events-none select-none" />
-              Leon-lab
+          <div className="flex items-center gap-3 md:gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <h1 className="text-xl md:text-3xl font-black text-brand-gold flex items-center gap-2 md:gap-3 drop-shadow-md">
+              <img src={logo} alt="Logo" className="w-10 h-10 md:w-16 md:h-16 object-contain pointer-events-none select-none" />
+              <span className="hidden sm:inline">Leon-lab</span>
             </h1>
             <div className="flex gap-2">
-              <button onClick={() => setShowRankModal(true)} className="bg-white/10 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs shadow-lg flex items-center gap-1.5 hover:bg-white/20 transition-all border border-white/5"><Medal className="w-3.5 h-3.5 md:w-4 md:h-4 text-brand-gold" /> 排行榜</button>
+              <button onClick={() => setShowRankModal(true)} className="bg-white/10 px-3 md:px-5 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm shadow-lg flex items-center gap-1.5 hover:bg-white/20 transition-all border border-white/5"><Medal className="w-4 h-4 md:w-5 md:h-5 text-brand-gold" /> <span className="hidden sm:inline">排行榜</span></button>
               {!isChallengeActive ? (
-                <button onClick={startChallenge} className="bg-gradient-to-r from-red-600 to-orange-600 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-black text-[10px] md:text-xs animate-bounce shadow-xl flex items-center gap-1.5 hover:from-red-500 hover:to-orange-500 transition-all"><Flame className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" /> 開始挑戰</button>
+                <button onClick={startChallenge} className="bg-gradient-to-r from-red-600 to-orange-600 px-4 md:px-6 py-2.5 md:py-3 rounded-full font-black text-xs md:text-sm animate-bounce shadow-xl flex items-center gap-1.5 hover:from-red-500 hover:to-orange-500 transition-all"><Flame className="w-4 h-4 md:w-5 md:h-5 text-white" /> 開始挑戰</button>
               ) : (
-                <button onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} className="bg-white/10 px-4 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs flex items-center gap-1.5 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"><XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" /> 放棄</button>
+                <button onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} className="bg-white/10 px-4 md:px-5 py-2.5 md:py-3 rounded-full font-bold text-xs md:text-sm flex items-center gap-1.5 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"><XCircle className="w-4 h-4 md:w-5 md:h-5" /> 放棄</button>
               )}
             </div>
           </div>
         </div>
 
         <div className="flex flex-col items-center mb-10 gap-4">
-          <div className="bg-black/40 p-1 rounded-2xl flex border border-white/10 relative">
-            {isChallengeActive && <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-red-400 font-bold flex items-center gap-1 animate-pulse"><AlertCircle className="w-3 h-3" /> 挑戰中鎖定模式</div>}
-            <button disabled={isChallengeActive} onClick={() => {setMode('SPLIT_POT'); setStreak(0);}} className={cn("px-6 sm:px-8 py-3 rounded-xl font-bold text-xs transition-all", mode === 'SPLIT_POT' ? "bg-brand-gold text-brand-green shadow-lg" : "text-slate-400", isChallengeActive && "opacity-50 cursor-not-allowed")}>底池計算</button>
-            <button disabled={isChallengeActive} onClick={() => {setMode('SHOWDOWN'); setStreak(0);}} className={cn("px-6 sm:px-8 py-3 rounded-xl font-bold text-xs transition-all", mode === 'SHOWDOWN' ? "bg-brand-gold text-brand-green shadow-lg" : "text-slate-400", isChallengeActive && "opacity-50 cursor-not-allowed")}>勝負判斷</button>
-            <button disabled={isChallengeActive} onClick={() => {setMode('QUIZ'); setStreak(0);}} className={cn("px-6 sm:px-8 py-3 rounded-xl font-bold text-xs transition-all", mode === 'QUIZ' ? "bg-brand-gold text-brand-green shadow-lg" : "text-slate-400", isChallengeActive && "opacity-50 cursor-not-allowed")}>理論測驗</button>
+          <div className="bg-black/40 p-1 rounded-2xl flex flex-wrap justify-center border border-white/10 relative">
+            {isChallengeActive && <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs text-red-400 font-bold flex items-center gap-1 animate-pulse whitespace-nowrap"><AlertCircle className="w-3.5 h-3.5" /> 挑戰中鎖定模式</div>}
+            <button disabled={isChallengeActive} onClick={() => {setMode('SPLIT_POT'); setStreak(0);}} className={cn("px-5 sm:px-8 py-3 rounded-xl font-bold text-sm transition-all", mode === 'SPLIT_POT' ? "bg-yellow-400 text-slate-900 shadow-lg" : "text-slate-300 hover:text-white", isChallengeActive && "opacity-50 cursor-not-allowed")}>底池計算</button>
+            <button disabled={isChallengeActive} onClick={() => {setMode('SHOWDOWN'); setStreak(0);}} className={cn("px-5 sm:px-8 py-3 rounded-xl font-bold text-sm transition-all", mode === 'SHOWDOWN' ? "bg-yellow-400 text-slate-900 shadow-lg" : "text-slate-300 hover:text-white", isChallengeActive && "opacity-50 cursor-not-allowed")}>勝負判斷</button>
+            <button disabled={isChallengeActive} onClick={() => {setMode('QUIZ'); setStreak(0);}} className={cn("px-5 sm:px-8 py-3 rounded-xl font-bold text-sm transition-all", mode === 'QUIZ' ? "bg-yellow-400 text-slate-900 shadow-lg" : "text-slate-300 hover:text-white", isChallengeActive && "opacity-50 cursor-not-allowed")}>理論測驗</button>
           </div>
-          {mode === 'SHOWDOWN' && (<div className="flex gap-2 relative">{isChallengeActive && <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] text-red-400 font-bold animate-pulse">種類已鎖定</div>}{(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (<button key={v} disabled={isChallengeActive} onClick={() => {setVariant(v); setStreak(0);}} className={cn("px-4 py-2 rounded-lg text-[10px] font-bold transition-all", variant === v ? "bg-white/20 text-white" : "text-slate-500", isChallengeActive && "opacity-50 cursor-not-allowed")}>{v}</button>))}</div>)}
+          {mode === 'SHOWDOWN' && (<div className="flex gap-2 relative">{isChallengeActive && <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-red-400 font-bold animate-pulse whitespace-nowrap">種類已鎖定</div>}{(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (<button key={v} disabled={isChallengeActive} onClick={() => {setVariant(v); setStreak(0);}} className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", variant === v ? "bg-white/20 text-white" : "text-slate-400", isChallengeActive && "opacity-50 cursor-not-allowed")}>{v}</button>))}</div>)}
         </div>
 
-        <div className="max-w-4xl mx-auto mb-10"><div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex gap-6 items-center backdrop-blur-sm"><div className="bg-brand-gold/20 p-4 rounded-2xl">{mode === 'SPLIT_POT' ? <Calculator className="w-8 h-8 text-brand-gold" /> : (mode === 'SHOWDOWN' ? <Eye className="w-8 h-8 text-blue-400" /> : <BookOpen className="w-8 h-8 text-blue-400" />)}</div><div className="space-y-1 text-slate-400 flex-1"><h3 className="text-white font-black uppercase tracking-wider">{mode === 'SPLIT_POT' ? '底池分配練習 (Pre-flop All-in)' : (mode === 'SHOWDOWN' ? '勝負判斷練習' : '理論知識測驗')}</h3><p className="text-xs leading-relaxed">{mode === 'SPLIT_POT' ? '模擬多位玩家在翻牌前全下的情境。計算主池與邊池金額，並依排名分配。' : (mode === 'SHOWDOWN' ? `判斷 ${variant} 規則下的贏家。` : '測試你對德州撲克規則與發牌程序的理解。')}</p>{mode === 'SHOWDOWN' && (<div className="mt-2 p-2 bg-blue-500/10 border-l-2 border-blue-500 text-[10px] text-blue-300">{variant === 'HOLDEM' ? '任意挑選 5 張。' : (variant === 'OMAHA' ? '強制 2 手牌 + 3 公牌。' : '高牌強制 2+3；低牌需 5 張 8 以下且不重複。')}</div>)}<div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="flex items-center gap-2"><Flame className="w-3 h-3 text-orange-500" /><div className="text-[10px]"><span className="text-white font-bold">連勝加成：</span>每連勝一場 +20% 分數</div></div><div className="flex items-center gap-2"><RefreshCw className="w-3 h-3 text-green-400" /><div className="text-[10px]"><span className="text-white font-bold">速度獎勵：</span>10秒內答對享 1.5x 加成</div></div><div className="flex items-center gap-2"><Star className="w-3 h-3 text-yellow-500" /><div className="text-[10px]"><span className="text-white font-bold">難度倍率：</span>BIGO(2x) &gt; Omaha(1.5x)</div></div></div></div></div></div>
+        <div className="max-w-4xl mx-auto mb-10"><div className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center backdrop-blur-sm"><div className="bg-brand-gold/20 p-3 md:p-4 rounded-2xl shrink-0">{mode === 'SPLIT_POT' ? <Calculator className="w-6 h-6 md:w-8 md:h-8 text-brand-gold" /> : (mode === 'SHOWDOWN' ? <Eye className="w-6 h-6 md:w-8 md:h-8 text-blue-400" /> : <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-blue-400" />)}</div><div className="space-y-2 text-slate-400 flex-1"><h3 className="text-white font-black uppercase tracking-wider text-sm md:text-base">{mode === 'SPLIT_POT' ? '底池分配練習 (Pre-flop All-in)' : (mode === 'SHOWDOWN' ? '勝負判斷練習' : '理論知識測驗')}</h3><p className="text-xs md:text-sm leading-relaxed">{mode === 'SPLIT_POT' ? '模擬多位玩家在翻牌前全下的情境。計算主池與邊池金額，並依排名分配。' : (mode === 'SHOWDOWN' ? `判斷 ${variant} 規則下的贏家。` : '測試你對德州撲克規則與發牌程序的理解。')}</p>{mode === 'SHOWDOWN' && (<div className="mt-2 p-2 md:p-3 bg-blue-500/10 border-l-2 border-blue-500 text-xs text-blue-300">{variant === 'HOLDEM' ? '任意挑選 5 張。' : (variant === 'OMAHA' ? '強制 2 手牌 + 3 公牌。' : '高牌強制 2+3；低牌需 5 張 8 以下且不重複。')}</div>)}<div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="flex items-center gap-2"><Flame className="w-3.5 h-3.5 text-orange-500" /><div className="text-xs"><span className="text-white font-bold">連勝加成：</span>每連勝一場 +20% 分數</div></div><div className="flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5 text-green-400" /><div className="text-xs"><span className="text-white font-bold">速度獎勵：</span>10秒內答對享 1.5x 加成</div></div><div className="flex items-center gap-2"><Star className="w-3.5 h-3.5 text-yellow-500" /><div className="text-xs"><span className="text-white font-bold">難度倍率：</span>BIGO(2x) &gt; Omaha(1.5x)</div></div></div></div></div></div>
         
         {mode === 'SPLIT_POT' ? renderSplitPot() : (mode === 'SHOWDOWN' ? renderShowdown() : renderQuiz())}
 
         {/* --- Profile Setup Modal --- */}
         {showProfileModal && (
           <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[3000] p-4">
-            <div className="bg-slate-900 border-2 border-brand-gold p-8 rounded-[3rem] max-w-md w-full text-center shadow-[0_0_100px_rgba(201,160,80,0.2)]">
+            <div className="bg-slate-900 border-2 border-brand-gold p-8 rounded-[3rem] max-w-md w-full text-center shadow-[0_0_100px_rgba(201,160,80,0.2)] relative">
+              {/* 關閉按鈕 - 只有已設定暱稱的使用者才能關閉 */}
+              {profile?.nickname && (
+                <button 
+                  onClick={() => setShowProfileModal(false)}
+                  className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+                  title="關閉"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              )}
+              
               <h2 className="text-3xl font-black text-white mb-2 tracking-tighter italic">新荷官入職設定</h2>
               <p className="text-slate-400 text-xs uppercase tracking-widest mb-8">請設定您的參賽個人資料</p>
               
@@ -544,13 +555,26 @@ const App: React.FC = () => {
                   />
                 </div>
                 
-                <button 
-                  onClick={() => saveProfile(playerName, profile?.avatar_url || null)}
-                  disabled={isUpdatingProfile || !playerName.trim()}
-                  className="w-full bg-brand-gold text-brand-green py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-yellow-500 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
-                >
-                  {isUpdatingProfile ? <Loader2 className="w-5 h-5 animate-spin" /> : "完成入職設定"}
-                </button>
+                <div className="flex gap-3">
+                  {profile?.nickname && (
+                    <button 
+                      onClick={() => setShowProfileModal(false)}
+                      className="flex-1 bg-white/10 text-white py-5 rounded-2xl font-bold uppercase hover:bg-white/20 transition-all"
+                    >
+                      取消
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => saveProfile(playerName, profile?.avatar_url || null)}
+                    disabled={isUpdatingProfile || !playerName.trim()}
+                    className={cn(
+                      "py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-yellow-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 bg-yellow-400 text-slate-900",
+                      profile?.nickname ? "flex-1" : "w-full"
+                    )}
+                  >
+                    {isUpdatingProfile ? <Loader2 className="w-5 h-5 animate-spin" /> : (profile?.nickname ? "儲存變更" : "完成入職設定")}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -566,7 +590,7 @@ const App: React.FC = () => {
                 <div className="text-slate-300 font-bold">恭喜 {profile?.nickname} 進榜！</div>
                 <div className="flex gap-3 mt-4">
                   <button onClick={() => {setShowSubmitModal(false); setTotalScore(0); setStreak(0);}} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:text-white transition-colors">跳過</button>
-                  <button onClick={handleSubmitScore} disabled={isSubmitting} className="flex-1 bg-brand-gold text-brand-green py-4 rounded-xl font-black uppercase text-xs shadow-lg hover:bg-yellow-500 transition-all flex items-center justify-center gap-2">{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "登錄排行"}</button>
+                  <button onClick={handleSubmitScore} disabled={isSubmitting} className="flex-1 bg-yellow-400 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg hover:bg-yellow-300 disabled:opacity-50 transition-all flex items-center justify-center gap-2">{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "登錄排行"}</button>
                 </div>
               </div>
             </div>
@@ -581,7 +605,7 @@ const App: React.FC = () => {
               <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-black text-brand-gold flex items-center gap-3 tracking-widest"><Medal className="w-8 h-8" /> 全球荷官排行榜</h2><button onClick={() => setShowRankModal(false)} className="text-slate-500 hover:text-white transition-colors"><XCircle /></button></div>
               <div className="flex bg-black/40 p-1 rounded-xl mb-6 overflow-x-auto whitespace-nowrap scrollbar-hide border border-white/5">
                 {rankTabConfig.map(tab => (
-                  <button key={tab.id} onClick={() => setActiveRankTab(tab.id)} className={cn("px-4 py-2.5 rounded-lg font-bold text-[10px] md:text-xs transition-all flex items-center gap-2", activeRankTab === tab.id ? "bg-brand-gold text-brand-green shadow-lg" : "text-slate-500 hover:text-slate-300 hover:bg-white/5")}>
+                  <button key={tab.id} onClick={() => setActiveRankTab(tab.id)} className={cn("px-4 py-2.5 rounded-lg font-bold text-[10px] md:text-xs transition-all flex items-center gap-2", activeRankTab === tab.id ? "bg-yellow-400 text-slate-900 shadow-lg" : "text-slate-400 hover:text-slate-200 hover:bg-white/5")}>
                     <tab.icon className="w-3 h-3" /> {tab.label}
                   </button>
                 ))}
@@ -591,7 +615,7 @@ const App: React.FC = () => {
                   leaderboard.map((e, i) => (
                     <div key={e.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between transition-all hover:bg-white/10 group">
                       <div className="flex items-center gap-4">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black transition-all", i === 0 ? "bg-brand-gold text-brand-green scale-110 shadow-lg" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}>{i + 1}</div>
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black transition-all", i === 0 ? "bg-yellow-400 text-slate-900 scale-110 shadow-lg" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}>{i + 1}</div>
                         <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/10 bg-slate-800">
                           {e.avatar_url ? <img src={e.avatar_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-2 text-slate-600" />}
                         </div>
@@ -607,26 +631,27 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* --- User Management Section (Bottom Left) --- */}
-        <div className="fixed bottom-8 left-8 z-50 flex items-center gap-3">
+        {/* --- User Management Section --- */}
+        <div className="fixed bottom-4 right-4 md:bottom-8 md:left-8 md:right-auto z-50 flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xl border border-white/10 p-2 pr-6 rounded-full shadow-2xl animate-in slide-in-from-left-4">
+            <div className="flex items-center gap-2 md:gap-3 bg-black/60 backdrop-blur-xl border border-white/10 p-2 md:pr-6 rounded-full shadow-2xl animate-in slide-in-from-right-4 md:slide-in-from-left-4">
               <div className="relative group cursor-pointer" onClick={() => setShowProfileModal(true)}>
-                <div className="w-10 h-10 rounded-full border-2 border-brand-gold overflow-hidden bg-slate-800">
+                <div className="w-10 h-10 md:w-10 md:h-10 rounded-full border-2 border-brand-gold overflow-hidden bg-slate-800">
                   {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-2 text-slate-500" />}
                 </div>
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full transition-opacity"><Settings className="w-4 h-4 text-white" /></div>
               </div>
-              <div>
+              <div className="hidden md:block">
                 <div className="text-[10px] text-brand-gold font-black uppercase tracking-tighter leading-none mb-1">Ranked Dealer</div>
                 <div className="text-xs font-bold text-white leading-none">{profile?.nickname || '設定暱稱...'}</div>
               </div>
-              <button onClick={handleLogout} className="ml-4 p-2 text-slate-500 hover:text-red-400 transition-colors" title="登出"><LogOut className="w-4 h-4" /></button>
+              <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-red-400 transition-colors" title="登出"><LogOut className="w-4 h-4" /></button>
             </div>
           ) : (
-            <button onClick={handleGoogleLogin} className="flex items-center gap-3 bg-white text-black px-6 py-3 rounded-full font-bold text-sm shadow-2xl hover:bg-slate-100 transition-all animate-in slide-in-from-left-4">
+            <button onClick={handleGoogleLogin} className="flex items-center gap-2 md:gap-3 bg-white text-black px-4 py-3 md:px-6 md:py-3 rounded-full font-bold text-sm shadow-2xl hover:bg-slate-100 transition-all animate-in slide-in-from-right-4 md:slide-in-from-left-4">
               <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
-              Google 一鍵入職
+              <span className="hidden sm:inline">Google 一鍵入職</span>
+              <span className="sm:hidden">登入</span>
             </button>
           )}
         </div>
