@@ -3,11 +3,12 @@ import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
 import * as QuizLogic from './utils/quizLogic';
 import { Question } from './utils/quizData';
+import AvatarUpload from './components/AvatarUpload';
 import logo from './assets/logo.png';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Trophy, XCircle, Info, Users, Coins, ArrowRight, Medal, Eye, 
-  Calculator, Star, Flame, Loader2, BookOpen, CheckCircle2, AlertCircle, RefreshCw 
+  Calculator, Star, Flame, Loader2, BookOpen, CheckCircle2, AlertCircle, RefreshCw, LogIn, LogOut, Settings, User as UserIcon
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -15,7 +16,7 @@ import { twMerge } from 'tailwind-merge';
 // --- Supabase Configuration ---
 const SUPABASE_URL = 'https://rnvmtdlyowunemwitmvg.supabase.co'; 
 const SUPABASE_ANON_KEY = 'sb_publishable_R2ZK679gVDrOv3X9Dbvfsw_Dw7Sd5N0';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,6 +25,12 @@ function cn(...inputs: ClassValue[]) {
 type MainMode = 'SPLIT_POT' | 'SHOWDOWN' | 'QUIZ';
 type LeaderboardType = 'SPLIT_POT' | 'SHOWDOWN_HOLDEM' | 'SHOWDOWN_OMAHA' | 'SHOWDOWN_BIGO' | 'QUIZ';
 
+interface Profile {
+  id: string;
+  nickname: string | null;
+  avatar_url: string | null;
+}
+
 interface LeaderboardEntry {
   id: string;
   name: string;
@@ -31,6 +38,8 @@ interface LeaderboardEntry {
   streak: number;
   type: LeaderboardType;
   created_at: string;
+  user_id?: string;
+  profiles?: Profile; // Supabase 關聯查詢
 }
 
 // --- Card Component ---
@@ -44,6 +53,13 @@ interface ShowdownPlayer { id: number; name: string; cards: PokerLogic.Card[]; h
 interface ShowdownScenario { variant: PokerLogic.GameVariant; communityCards: PokerLogic.Card[]; players: ShowdownPlayer[]; }
 
 const App: React.FC = () => {
+  // --- User & Auth States ---
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  // --- Game States ---
   const [mode, setMode] = useState<MainMode>('SPLIT_POT');
   const [variant, setVariant] = useState<PokerLogic.GameVariant>('HOLDEM');
   const [streak, setStreak] = useState(0);
@@ -52,7 +68,6 @@ const App: React.FC = () => {
   const [lastPoints, setLastPoints] = useState<number>(0);
   const [startTime, setStartTime] = useState<number>(Date.now());
 
-  // --- Game States ---
   const [potPlayers, setPotPlayers] = useState<PotCalc.Player[]>([]);
   const [stage, setStage] = useState<'POTS' | 'PAYOUTS'>('POTS');
   const [potAnswers, setPotAnswers] = useState<Record<string, string>>({});
@@ -75,7 +90,6 @@ const App: React.FC = () => {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRankModal, setShowRankModal] = useState(false);
   const [activeRankTab, setActiveRankTab] = useState<LeaderboardType>('SPLIT_POT');
-  const [playerName, setPlayerName] = useState("");
   const [finalScore, setFinalScore] = useState(0);
   const [finalStreak, setFinalStreak] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -83,6 +97,69 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRank, setIsLoadingRank] = useState(false);
 
+  // --- Auth Handlers ---
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+  };
+
+  const fetchProfile = async (uid: string) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (data) {
+      setProfile(data);
+      if (!data.nickname) setShowProfileModal(true);
+    } else {
+      // 建立初始 Profile
+      const newProfile = { id: uid, nickname: '', avatar_url: null };
+      await supabase.from('profiles').insert([newProfile]);
+      setProfile(newProfile);
+      setShowProfileModal(true);
+    }
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const saveProfile = async (nickname: string, avatarUrl: string | null) => {
+    if (!user) return;
+    setIsUpdatingProfile(true);
+    try {
+      const { error } = await supabase.from('profiles').upsert({
+        id: user.id,
+        nickname,
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+      setProfile({ id: user.id, nickname, avatar_url: avatarUrl });
+      setShowProfileModal(false);
+    } catch (err: any) {
+      alert(err.message.includes('unique') ? '此暱稱已被使用，請換一個' : '儲存失敗');
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
+  // --- Helpers ---
   const currentType = useMemo((): LeaderboardType => {
     if (mode === 'SPLIT_POT') return 'SPLIT_POT';
     if (mode === 'QUIZ') return 'QUIZ';
@@ -100,9 +177,14 @@ const App: React.FC = () => {
   const fetchLeaderboard = useCallback(async (type: LeaderboardType) => {
     setIsLoadingRank(true);
     try {
-      const { data } = await supabase.from('leaderboard').select('*').eq('type', type).order('score', { ascending: false }).limit(10);
+      const { data } = await supabase
+        .from('leaderboard')
+        .select('*, profiles(nickname, avatar_url)')
+        .eq('type', type)
+        .order('score', { ascending: false })
+        .limit(10);
       if (data) {
-        setLeaderboard(data as LeaderboardEntry[]);
+        setLeaderboard(data as any);
         setMinHighScores(prev => ({ ...prev, [type]: data.length >= 10 ? data[9].score : 0 }));
       } else { setLeaderboard([]); }
     } catch (err) { console.error(err); }
@@ -159,84 +241,42 @@ const App: React.FC = () => {
     return points;
   };
 
-    const updateStreak = (correct: boolean, basePointsForScore: number = 0) => {
-
-      if (correct) {
-
-        if (basePointsForScore > 0) calculatePoints(basePointsForScore);
-
-        setStreak(s => {
-
-          const next = s + 1;
-
-          if (next > bestStreak) setBestStreak(next);
-
-          return next;
-
-        });
-
-        
-
-        // 挑戰模式下：自動跳題邏輯
-
-        if (isChallengeActive) {
-
-          setTimeout(() => {
-
-            if (mode === 'SPLIT_POT') {
-
-              if (stage === 'POTS') {
-
-                setStage('PAYOUTS');
-
-                setShowPotResult(false);
-
-              } else {
-
-                initSplitPot();
-
-              }
-
-            } else if (mode === 'SHOWDOWN') {
-
-              initShowdown();
-
-            } else if (mode === 'QUIZ') {
-
-              setCurrentQuizIdx(prev => (prev + 1) % quizQuestions.length);
-
-              setSelectedQuizOption(null);
-
-              setShowQuizResult(false);
-
-              setStartTime(Date.now());
-
-            }
-
-          }, 800); // 延遲 0.8 秒讓玩家看正確反饋
-
-        }
-
-      } else {
-
-  
+  const updateStreak = (correct: boolean, basePointsForScore: number = 0) => {
+    if (correct) {
+      if (basePointsForScore > 0) calculatePoints(basePointsForScore);
+      setStreak(s => { const next = s + 1; if (next > bestStreak) setBestStreak(next); return next; });
+      if (isChallengeActive) {
+        setTimeout(() => {
+          if (mode === 'SPLIT_POT') { if (stage === 'POTS') { setStage('PAYOUTS'); setShowPotResult(false); } else { initSplitPot(); } }
+          else if (mode === 'SHOWDOWN') initShowdown();
+          else if (mode === 'QUIZ') { setCurrentQuizIdx(prev => (prev + 1) % quizQuestions.length); setSelectedQuizOption(null); setShowQuizResult(false); setStartTime(Date.now()); }
+        }, 800);
+      }
+    } else {
       if (!isChallengeActive) setTotalScore(0);
       setStreak(0); setLastPoints(0);
     }
   };
 
   const startChallenge = () => {
+    if (!user) { alert('請先登入 Google 帳號以參加挑戰並列入排行榜！'); handleGoogleLogin(); return; }
     setIsChallengeActive(true); setChallengeTimeLeft(300); setTotalScore(0); setStreak(0); setLastPoints(0);
     setActiveRankTab(currentType); 
     if (mode === 'SPLIT_POT') initSplitPot(); else if (mode === 'SHOWDOWN') initShowdown(); else initQuiz();
   };
 
   const handleSubmitScore = async () => {
-    if (!playerName.trim() || isSubmitting) return;
+    if (isSubmitting || !profile?.nickname) return;
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('leaderboard').insert([{ name: playerName, score: finalScore, streak: finalStreak, type: currentType }]);
-      if (!error) { setShowSubmitModal(false); setPlayerName(""); setActiveRankTab(currentType); fetchLeaderboard(currentType); setShowRankModal(true); }
+      const { error } = await supabase.from('leaderboard').insert([{ 
+        name: profile.nickname, // 自動使用 Profile 內的暱稱
+        score: finalScore, 
+        streak: finalStreak, 
+        type: currentType,
+        user_id: user.id
+      }]);
+      if (!error) { setShowSubmitModal(false); setActiveRankTab(currentType); fetchLeaderboard(currentType); setShowRankModal(true); }
     } catch (err) { console.error(err); }
     finally { setIsSubmitting(false); }
   };
@@ -256,17 +296,7 @@ const App: React.FC = () => {
                     <div className="relative"><div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-xl">{p.name.slice(-1)}</div><div className="absolute -top-1 -right-1 bg-red-600 text-[6px] font-black px-1 rounded-sm border border-white/20 uppercase shadow-lg">ALL IN</div></div>
                     <div><div className="text-slate-200 font-bold">{p.name}</div><div className="text-[8px] text-slate-500 uppercase">Active</div></div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-black font-mono text-white">${p.bet.toLocaleString()}</div>
-                    {stage === 'PAYOUTS' && (
-                      <div className={cn(
-                        "text-[8px] font-black px-1.5 py-0.5 rounded mt-1 inline-block uppercase", 
-                        p.rank === 1 ? "bg-green-500 text-white shadow-sm" : "bg-white/10 text-slate-400"
-                      )}>
-                        {p.rankName}
-                      </div>
-                    )}
-                  </div>
+                  <div className="text-right"><div className="text-2xl font-black font-mono text-white">${p.bet.toLocaleString()}</div>{stage === 'PAYOUTS' && <div className={cn("text-[8px] font-black px-1.5 py-0.5 rounded mt-1 inline-block uppercase", p.rank === 1 ? "bg-green-500 text-white shadow-sm" : "bg-white/10 text-slate-400")}>{p.rankName}</div>}</div>
                 </div>
               ))}
             </div>
@@ -274,21 +304,7 @@ const App: React.FC = () => {
           {stage === 'PAYOUTS' && (
             <div className="bg-gradient-to-r from-poker-gold/10 to-transparent border border-poker-gold/20 p-6 rounded-[2rem] shadow-xl">
               <h3 className="text-[8px] font-black text-poker-gold uppercase mb-4 flex items-center gap-2"><Coins className="w-3 h-3" /> 已確認底池</h3>
-              <div className="flex flex-wrap gap-4">
-                {correctPots.map(pot => (
-                  <div key={pot.name} className="bg-black/60 p-4 rounded-2xl min-w-[150px] border border-white/5 shadow-inner relative">
-                    <div className="absolute top-2 right-2 flex gap-0.5">
-                      {pot.eligiblePlayerIds.map(id => (
-                        <div key={id} className="w-3 h-3 rounded-full bg-poker-gold/20 border border-poker-gold/40 flex items-center justify-center text-[6px] text-poker-gold font-bold">
-                          {potPlayers.find(p => p.id === id)?.name.slice(-1)}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-[8px] text-slate-500 uppercase mb-1">{pot.name}</div>
-                    <div className="text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
+              <div className="flex flex-wrap gap-4">{correctPots.map(pot => (<div key={pot.name} className="bg-black/60 p-4 rounded-2xl min-w-[150px] border border-white/5 shadow-inner relative"><div className="absolute top-2 right-2 flex gap-0.5">{pot.eligiblePlayerIds.map(id => (<div key={id} className="w-3 h-3 rounded-full bg-poker-gold/20 border border-poker-gold/40 flex items-center justify-center text-[6px] text-poker-gold font-bold">{potPlayers.find(px => px.id === id)?.name.slice(-1)}</div>))}</div><div className="text-[8px] text-slate-500 uppercase mb-1">{pot.name}</div><div className="text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div></div>))}</div>
             </div>
           )}
         </div>
@@ -404,7 +420,7 @@ const App: React.FC = () => {
                 <div className="text-lg md:text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div>
               </div>
             )}
-            <div className="flex flex-col items-center border-r border-white/20 px-2 md:px-4">
+            <div className="flex flex-col items-center border-r border-white/20 px-2 md:px-4 relative">
               <span className="text-[7px] md:text-[8px] text-poker-gold font-bold uppercase tracking-widest">Points</span>
               <div className="flex items-center gap-1 text-poker-gold"><Coins className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="text-lg md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
               {lastPoints > 0 && <div className="text-[7px] md:text-[8px] text-green-400 font-bold animate-bounce absolute -top-4">+{lastPoints}</div>}
@@ -420,30 +436,16 @@ const App: React.FC = () => {
               DEALERPRO
             </h1>
             <div className="flex gap-2">
-              <button 
-                onClick={() => setShowRankModal(true)} 
-                className="bg-white/10 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs shadow-lg flex items-center gap-1.5 hover:bg-white/20 transition-all border border-white/5"
-              >
-                <Medal className="w-3.5 h-3.5 md:w-4 md:h-4 text-poker-gold" /> 排行榜
-              </button>
+              <button onClick={() => setShowRankModal(true)} className="bg-white/10 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs shadow-lg flex items-center gap-1.5 hover:bg-white/20 transition-all border border-white/5"><Medal className="w-3.5 h-3.5 md:w-4 md:h-4 text-poker-gold" /> 排行榜</button>
               {!isChallengeActive ? (
-                <button 
-                  onClick={startChallenge} 
-                  className="bg-gradient-to-r from-red-600 to-orange-600 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-black text-[10px] md:text-xs animate-bounce shadow-xl flex items-center gap-1.5 hover:from-red-500 hover:to-orange-500 transition-all"
-                >
-                  <Flame className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" /> 開始挑戰
-                </button>
+                <button onClick={startChallenge} className="bg-gradient-to-r from-red-600 to-orange-600 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-black text-[10px] md:text-xs animate-bounce shadow-xl flex items-center gap-1.5 hover:from-red-500 hover:to-orange-500 transition-all"><Flame className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" /> 開始挑戰</button>
               ) : (
-                <button 
-                  onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} 
-                  className="bg-white/10 px-4 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs flex items-center gap-1.5 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"
-                >
-                  <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" /> 放棄
-                </button>
+                <button onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} className="bg-white/10 px-4 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs flex items-center gap-1.5 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"><XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" /> 放棄</button>
               )}
             </div>
           </div>
         </div>
+
         <div className="flex flex-col items-center mb-10 gap-4">
           <div className="bg-black/40 p-1 rounded-2xl flex border border-white/10 relative">
             {isChallengeActive && <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-[10px] text-red-400 font-bold flex items-center gap-1 animate-pulse"><AlertCircle className="w-3 h-3" /> 挑戰中鎖定模式</div>}
@@ -453,18 +455,92 @@ const App: React.FC = () => {
           </div>
           {mode === 'SHOWDOWN' && (<div className="flex gap-2 relative">{isChallengeActive && <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] text-red-400 font-bold animate-pulse">種類已鎖定</div>}{(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (<button key={v} disabled={isChallengeActive} onClick={() => {setVariant(v); setStreak(0);}} className={cn("px-4 py-2 rounded-lg text-[10px] font-bold transition-all", variant === v ? "bg-white/20 text-white" : "text-slate-500", isChallengeActive && "opacity-50 cursor-not-allowed")}>{v}</button>))}</div>)}
         </div>
+
         <div className="max-w-4xl mx-auto mb-10"><div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex gap-6 items-center backdrop-blur-sm"><div className="bg-poker-gold/20 p-4 rounded-2xl">{mode === 'SPLIT_POT' ? <Calculator className="w-8 h-8 text-poker-gold" /> : (mode === 'SHOWDOWN' ? <Eye className="w-8 h-8 text-blue-400" /> : <BookOpen className="w-8 h-8 text-blue-400" />)}</div><div className="space-y-1 text-slate-400 flex-1"><h3 className="text-white font-black uppercase tracking-wider">{mode === 'SPLIT_POT' ? '底池分配練習 (Pre-flop All-in)' : (mode === 'SHOWDOWN' ? '勝負判斷練習' : '理論知識測驗')}</h3><p className="text-xs leading-relaxed">{mode === 'SPLIT_POT' ? '模擬多位玩家在翻牌前全下的情境。計算主池與邊池金額，並依排名分配。' : (mode === 'SHOWDOWN' ? `判斷 ${variant} 規則下的贏家。` : '測試你對德州撲克規則與發牌程序的理解。')}</p>{mode === 'SHOWDOWN' && (<div className="mt-2 p-2 bg-blue-500/10 border-l-2 border-blue-500 text-[10px] text-blue-300">{variant === 'HOLDEM' ? '任意挑選 5 張。' : (variant === 'OMAHA' ? '強制 2 手牌 + 3 公牌。' : '高牌強制 2+3；低牌需 5 張 8 以下且不重複。')}</div>)}<div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3"><div className="flex items-center gap-2"><Flame className="w-3 h-3 text-orange-500" /><div className="text-[10px]"><span className="text-white font-bold">連勝加成：</span>每連勝一場 +20% 分數</div></div><div className="flex items-center gap-2"><RefreshCw className="w-3 h-3 text-green-400" /><div className="text-[10px]"><span className="text-white font-bold">速度獎勵：</span>10秒內答對享 1.5x 加成</div></div><div className="flex items-center gap-2"><Star className="w-3 h-3 text-yellow-500" /><div className="text-[10px]"><span className="text-white font-bold">難度倍率：</span>BIGO(2x) &gt; Omaha(1.5x)</div></div></div></div></div></div>
+        
         {mode === 'SPLIT_POT' ? renderSplitPot() : (mode === 'SHOWDOWN' ? renderShowdown() : renderQuiz())}
+
+        {/* --- Profile Setup Modal --- */}
+        {showProfileModal && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[3000] p-4">
+            <div className="bg-slate-900 border-2 border-poker-gold p-8 rounded-[3rem] max-w-md w-full text-center shadow-[0_0_100px_rgba(201,160,80,0.2)]">
+              <h2 className="text-3xl font-black text-white mb-2 tracking-tighter italic">新荷官入職設定</h2>
+              <p className="text-slate-400 text-xs uppercase tracking-widest mb-8">請設定您的參賽個人資料</p>
+              
+              <AvatarUpload 
+                userId={user?.id} 
+                currentAvatarUrl={profile?.avatar_url || ''} 
+                onUploadSuccess={(url) => setProfile(prev => prev ? ({ ...prev, avatar_url: url }) : null)} 
+              />
+
+              {/* 預設頭像挑選 */}
+              <div className="mt-6">
+                <p className="text-[10px] text-slate-500 uppercase font-bold mb-3">或挑選預設頭像</p>
+                <div className="flex justify-center gap-2 flex-wrap">
+                  {[
+                    'https://api.dicebear.com/7.x/bottts/svg?seed=Lucky',
+                    'https://api.dicebear.com/7.x/bottts/svg?seed=Ace',
+                    'https://api.dicebear.com/7.x/bottts/svg?seed=Dealer',
+                    'https://api.dicebear.com/7.x/bottts/svg?seed=Shark',
+                    'https://api.dicebear.com/7.x/bottts/svg?seed=Chips'
+                  ].map((url, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => setProfile(prev => prev ? ({ ...prev, avatar_url: url }) : null)}
+                      className={cn(
+                        "w-10 h-10 rounded-full border-2 transition-all hover:scale-110 overflow-hidden bg-slate-800",
+                        profile?.avatar_url === url ? "border-poker-gold ring-2 ring-poker-gold/20" : "border-white/10"
+                      )}
+                    >
+                      <img src={url} alt="" className="w-full h-full" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-6">
+                <div className="text-left space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-2">荷官暱稱</label>
+                  <input 
+                    type="text" 
+                    placeholder="輸入暱稱 (最多12字)" 
+                    value={playerName}
+                    maxLength={12}
+                    onChange={(e) => setPlayerName(e.target.value.replace(/[<>]/g, ''))}
+                    className="w-full bg-black border-2 border-white/5 rounded-2xl p-4 text-white text-center font-bold focus:border-poker-gold outline-none transition-all"
+                  />
+                </div>
+                
+                <button 
+                  onClick={() => saveProfile(playerName, profile?.avatar_url || null)}
+                  disabled={isUpdatingProfile || !playerName.trim()}
+                  className="w-full bg-poker-gold text-poker-green py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-yellow-500 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+                >
+                  {isUpdatingProfile ? <Loader2 className="w-5 h-5 animate-spin" /> : "完成入職設定"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- Submission Modal --- */}
         {showSubmitModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border-2 border-poker-gold p-8 rounded-[2rem] max-w-sm w-full text-center shadow-[0_0_50px_rgba(201,160,80,0.2)]">
               <Trophy className="w-16 h-16 text-poker-gold mx-auto mb-4" /><h2 className="text-2xl font-black text-white mb-2">挑戰結束！</h2>
               <div className="bg-white/5 rounded-2xl p-4 mb-6"><div className="text-slate-400 text-xs uppercase font-bold">{rankTabConfig.find(t=>t.id===currentType)?.label} 最終得分</div><div className="text-4xl font-black text-poker-gold">{finalScore.toLocaleString()}</div><div className="text-slate-500 text-[10px] mt-1 font-bold">連勝次數: {finalStreak}</div></div>
-              <input type="text" placeholder="輸入你的稱號 (最多12字)" value={playerName} maxLength={12} onChange={e => setPlayerName(e.target.value.replace(/[<>]/g, ''))} className="w-full bg-black/50 border-2 border-white/10 rounded-xl p-4 text-white text-center font-bold mb-4 focus:border-poker-gold outline-none" />
-              <div className="flex gap-3"><button onClick={() => {setShowSubmitModal(false); setTotalScore(0); setStreak(0);}} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:text-white transition-colors">跳過</button><button onClick={handleSubmitScore} disabled={isSubmitting || !playerName.trim()} className="flex-1 bg-poker-gold text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg hover:bg-yellow-500 transition-all flex items-center justify-center gap-2">{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "登錄排行"}</button></div>
+              <div className="flex flex-col gap-3">
+                <div className="text-slate-300 font-bold">恭喜 {profile?.nickname} 進榜！</div>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => {setShowSubmitModal(false); setTotalScore(0); setStreak(0);}} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:text-white transition-colors">跳過</button>
+                  <button onClick={handleSubmitScore} disabled={isSubmitting} className="flex-1 bg-poker-gold text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg hover:bg-yellow-500 transition-all flex items-center justify-center gap-2">{isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> : "登錄排行"}</button>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* --- Leaderboard Modal --- */}
         {showRankModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border-2 border-poker-gold/30 p-6 md:p-8 rounded-[2.5rem] max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
@@ -481,7 +557,13 @@ const App: React.FC = () => {
                 {isLoadingRank ? (<div className="flex flex-col items-center py-20 text-slate-500"><Loader2 className="w-10 h-10 animate-spin mb-4" /><div className="font-bold uppercase tracking-widest text-xs">讀取排行中...</div></div>) : leaderboard.length > 0 ? (
                   leaderboard.map((e, i) => (
                     <div key={e.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between transition-all hover:bg-white/10 group">
-                      <div className="flex items-center gap-4"><div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black transition-all", i === 0 ? "bg-poker-gold text-poker-green scale-110 shadow-lg" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}>{i + 1}</div><div><div className="font-bold text-white group-hover:text-poker-gold transition-colors">{e.name}</div><div className="text-[8px] text-slate-500">{new Date(e.created_at).toLocaleDateString()}</div></div></div>
+                      <div className="flex items-center gap-4">
+                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black transition-all", i === 0 ? "bg-poker-gold text-poker-green scale-110 shadow-lg" : "bg-slate-800 text-slate-400 group-hover:bg-slate-700")}>{i + 1}</div>
+                        <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/10 bg-slate-800">
+                          {e.profiles?.avatar_url ? <img src={e.profiles.avatar_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-2 text-slate-600" />}
+                        </div>
+                        <div><div className="font-bold text-white group-hover:text-poker-gold transition-colors">{e.profiles?.nickname || e.name}</div><div className="text-[8px] text-slate-500">{new Date(e.created_at).toLocaleDateString()}</div></div>
+                      </div>
                       <div className="text-right"><div className="text-lg font-black text-white group-hover:scale-105 transition-all">{e.score.toLocaleString()}</div><div className="text-[10px] text-poker-gold font-bold uppercase tracking-tighter">STREAK: {e.streak}</div></div>
                     </div>
                   ))
@@ -491,6 +573,31 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* --- User Management Section (Header Profile Area) --- */}
+        <div className="fixed bottom-8 left-8 z-50 flex items-center gap-3">
+          {user ? (
+            <div className="flex items-center gap-3 bg-black/60 backdrop-blur-xl border border-white/10 p-2 pr-6 rounded-full shadow-2xl animate-in slide-in-from-left-4">
+              <div className="relative group cursor-pointer" onClick={() => setShowProfileModal(true)}>
+                <div className="w-10 h-10 rounded-full border-2 border-poker-gold overflow-hidden bg-slate-800">
+                  {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-full h-full p-2 text-slate-500" />}
+                </div>
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-full transition-opacity"><Settings className="w-4 h-4 text-white" /></div>
+              </div>
+              <div>
+                <div className="text-[10px] text-poker-gold font-black uppercase tracking-tighter leading-none mb-1">Ranked Dealer</div>
+                <div className="text-xs font-bold text-white leading-none">{profile?.nickname || '設定暱稱...'}</div>
+              </div>
+              <button onClick={handleLogout} className="ml-4 p-2 text-slate-500 hover:text-red-400 transition-colors" title="登出"><LogOut className="w-4 h-4" /></button>
+            </div>
+          ) : (
+            <button onClick={handleGoogleLogin} className="flex items-center gap-3 bg-white text-black px-6 py-3 rounded-full font-bold text-sm shadow-2xl hover:bg-slate-100 transition-all animate-in slide-in-from-left-4">
+              <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
+              Google 一鍵入職
+            </button>
+          )}
+        </div>
+
         <footer className="mt-20 text-center text-slate-500 text-[10px] border-t border-white/5 pt-8 uppercase tracking-[0.4em] opacity-50">Professional Dealer Training Utility • 2026</footer>
       </div>
     </div>
