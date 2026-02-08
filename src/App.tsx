@@ -3,6 +3,7 @@ import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
 import * as QuizLogic from './utils/quizLogic';
 import { Question } from './utils/quizData';
+import logo from './assets/logo.png';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Trophy, XCircle, Info, Users, Coins, ArrowRight, Medal, Eye, 
@@ -158,11 +159,67 @@ const App: React.FC = () => {
     return points;
   };
 
-  const updateStreak = (correct: boolean, basePointsForScore: number = 0) => {
-    if (correct) {
-      if (basePointsForScore > 0) calculatePoints(basePointsForScore);
-      setStreak(s => { const next = s + 1; if (next > bestStreak) setBestStreak(next); return next; });
-    } else {
+    const updateStreak = (correct: boolean, basePointsForScore: number = 0) => {
+
+      if (correct) {
+
+        if (basePointsForScore > 0) calculatePoints(basePointsForScore);
+
+        setStreak(s => {
+
+          const next = s + 1;
+
+          if (next > bestStreak) setBestStreak(next);
+
+          return next;
+
+        });
+
+        
+
+        // 挑戰模式下：自動跳題邏輯
+
+        if (isChallengeActive) {
+
+          setTimeout(() => {
+
+            if (mode === 'SPLIT_POT') {
+
+              if (stage === 'POTS') {
+
+                setStage('PAYOUTS');
+
+                setShowPotResult(false);
+
+              } else {
+
+                initSplitPot();
+
+              }
+
+            } else if (mode === 'SHOWDOWN') {
+
+              initShowdown();
+
+            } else if (mode === 'QUIZ') {
+
+              setCurrentQuizIdx(prev => (prev + 1) % quizQuestions.length);
+
+              setSelectedQuizOption(null);
+
+              setShowQuizResult(false);
+
+              setStartTime(Date.now());
+
+            }
+
+          }, 800); // 延遲 0.8 秒讓玩家看正確反饋
+
+        }
+
+      } else {
+
+  
       if (!isChallengeActive) setTotalScore(0);
       setStreak(0); setLastPoints(0);
     }
@@ -316,16 +373,50 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-poker-green text-white p-3 md:p-8 font-sans selection:bg-poker-gold selection:text-poker-green">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-          <div className="flex items-center gap-3 bg-black/40 px-6 py-3 rounded-2xl border border-white/10 shadow-lg">
-            {isChallengeActive && (<div className="flex flex-col items-center border-r border-white/20 pr-4"><span className="text-[8px] text-red-400 font-bold uppercase animate-pulse">Time Left</span><div className="text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div></div>)}
-            <div className="flex flex-col items-center border-r border-white/20 px-4"><span className="text-[8px] text-poker-gold font-bold uppercase tracking-widest">Points</span><div className="flex items-center gap-1 text-poker-gold"><Coins className="w-4 h-4" /><span className="text-2xl font-black">{totalScore.toLocaleString()}</span></div>{lastPoints > 0 && <div className="text-[8px] text-green-400 font-bold animate-bounce">+{lastPoints}</div>}</div>
-            <div className="flex flex-col items-center px-4"><span className="text-[8px] text-poker-gold font-bold uppercase tracking-widest">Streak</span><div className="flex items-center gap-1"><Flame className={cn("w-5 h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-2xl font-black">{streak}</span></div></div>
+          <div className="flex items-center gap-2 md:gap-3 bg-black/40 px-4 md:px-6 py-2.5 md:py-3 rounded-2xl border border-white/10 shadow-lg w-full sm:w-auto justify-between sm:justify-start">
+            {isChallengeActive && (
+              <div className="flex flex-col items-center border-r border-white/20 pr-2 md:pr-4">
+                <span className="text-[7px] md:text-[8px] text-red-400 font-bold uppercase animate-pulse">Time Left</span>
+                <div className="text-lg md:text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div>
+              </div>
+            )}
+            <div className="flex flex-col items-center border-r border-white/20 px-2 md:px-4">
+              <span className="text-[7px] md:text-[8px] text-poker-gold font-bold uppercase tracking-widest">Points</span>
+              <div className="flex items-center gap-1 text-poker-gold"><Coins className="w-3.5 h-3.5 md:w-4 md:h-4" /><span className="text-lg md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
+              {lastPoints > 0 && <div className="text-[7px] md:text-[8px] text-green-400 font-bold animate-bounce absolute -top-4">+{lastPoints}</div>}
+            </div>
+            <div className="flex flex-col items-center px-2 md:px-4">
+              <span className="text-[7px] md:text-[8px] text-poker-gold font-bold uppercase tracking-widest">Streak</span>
+              <div className="flex items-center gap-1"><Flame className={cn("w-4 h-4 md:w-5 md:h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-lg md:text-2xl font-black">{streak}</span></div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-black text-poker-gold flex items-center gap-2 drop-shadow-md"><Trophy className="w-7 h-7" /> DEALERPRO</h1>
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <h1 className="text-xl md:text-2xl font-black text-poker-gold flex items-center gap-3 drop-shadow-md">
+              <img src={logo} alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain pointer-events-none select-none" />
+              DEALERPRO
+            </h1>
             <div className="flex gap-2">
-              <button onClick={() => setShowRankModal(true)} className="bg-white/10 px-5 py-2.5 rounded-full font-bold text-xs shadow-lg flex items-center gap-2 hover:bg-white/20 transition-all border border-white/5"><Medal className="w-4 h-4 text-poker-gold" /> 排行榜</button>
-              {!isChallengeActive ? (<button onClick={startChallenge} className="bg-gradient-to-r from-red-600 to-orange-600 px-6 py-2.5 rounded-full font-black text-xs animate-bounce shadow-xl flex items-center gap-2 hover:from-red-500 hover:to-orange-500 transition-all"><Flame className="w-4 h-4 text-white" /> 開始挑戰 (5分鐘)</button>) : (<button onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} className="bg-white/10 px-5 py-2.5 rounded-full font-bold text-xs flex items-center gap-2 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"><XCircle className="w-4 h-4" /> 放棄</button>)}
+              <button 
+                onClick={() => setShowRankModal(true)} 
+                className="bg-white/10 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs shadow-lg flex items-center gap-1.5 hover:bg-white/20 transition-all border border-white/5"
+              >
+                <Medal className="w-3.5 h-3.5 md:w-4 md:h-4 text-poker-gold" /> 排行榜
+              </button>
+              {!isChallengeActive ? (
+                <button 
+                  onClick={startChallenge} 
+                  className="bg-gradient-to-r from-red-600 to-orange-600 px-4 md:px-6 py-2 md:py-2.5 rounded-full font-black text-[10px] md:text-xs animate-bounce shadow-xl flex items-center gap-1.5 hover:from-red-500 hover:to-orange-500 transition-all"
+                >
+                  <Flame className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" /> 開始挑戰
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {setIsChallengeActive(false); setTotalScore(0);}} 
+                  className="bg-white/10 px-4 md:px-5 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs flex items-center gap-1.5 hover:bg-red-500/20 transition-all border border-red-500/20 text-red-400"
+                >
+                  <XCircle className="w-3.5 h-3.5 md:w-4 md:h-4" /> 放棄
+                </button>
+              )}
             </div>
           </div>
         </div>
