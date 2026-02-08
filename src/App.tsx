@@ -256,7 +256,17 @@ const App: React.FC = () => {
                     <div className="relative"><div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-xl">{p.name.slice(-1)}</div><div className="absolute -top-1 -right-1 bg-red-600 text-[6px] font-black px-1 rounded-sm border border-white/20 uppercase shadow-lg">ALL IN</div></div>
                     <div><div className="text-slate-200 font-bold">{p.name}</div><div className="text-[8px] text-slate-500 uppercase">Active</div></div>
                   </div>
-                  <div className="text-right"><div className="text-2xl font-black font-mono text-white">${p.bet.toLocaleString()}</div>{stage === 'PAYOUTS' && <div className="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/10 text-slate-400 uppercase">{p.rankName}</div>}</div>
+                  <div className="text-right">
+                    <div className="text-2xl font-black font-mono text-white">${p.bet.toLocaleString()}</div>
+                    {stage === 'PAYOUTS' && (
+                      <div className={cn(
+                        "text-[8px] font-black px-1.5 py-0.5 rounded mt-1 inline-block uppercase", 
+                        p.rank === 1 ? "bg-green-500 text-white shadow-sm" : "bg-white/10 text-slate-400"
+                      )}>
+                        {p.rankName}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -264,7 +274,21 @@ const App: React.FC = () => {
           {stage === 'PAYOUTS' && (
             <div className="bg-gradient-to-r from-poker-gold/10 to-transparent border border-poker-gold/20 p-6 rounded-[2rem] shadow-xl">
               <h3 className="text-[8px] font-black text-poker-gold uppercase mb-4 flex items-center gap-2"><Coins className="w-3 h-3" /> 已確認底池</h3>
-              <div className="flex flex-wrap gap-4">{correctPots.map(pot => (<div key={pot.name} className="bg-black/60 p-4 rounded-2xl min-w-[150px] border border-white/5 shadow-inner"><div className="text-[8px] text-slate-500 uppercase mb-1">{pot.name}</div><div className="text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div></div>))}</div>
+              <div className="flex flex-wrap gap-4">
+                {correctPots.map(pot => (
+                  <div key={pot.name} className="bg-black/60 p-4 rounded-2xl min-w-[150px] border border-white/5 shadow-inner relative">
+                    <div className="absolute top-2 right-2 flex gap-0.5">
+                      {pot.eligiblePlayerIds.map(id => (
+                        <div key={id} className="w-3 h-3 rounded-full bg-poker-gold/20 border border-poker-gold/40 flex items-center justify-center text-[6px] text-poker-gold font-bold">
+                          {potPlayers.find(p => p.id === id)?.name.slice(-1)}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[8px] text-slate-500 uppercase mb-1">{pot.name}</div>
+                    <div className="text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
