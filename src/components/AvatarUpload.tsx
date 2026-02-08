@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
-import { supabase } from '../App'; // 引用主程式的 supabase client
+import { storage } from '../firebase'; // 引用 Firebase storage
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface AvatarUploadProps {
   userId: string;
@@ -63,23 +64,25 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ userId, onUploadSuccess, cu
   };
 
   const handleUpload = async () => {
+    if (!userId) return;
     try {
       setIsUploading(true);
       const blob = await createCroppedImage();
       if (!blob) return;
 
-      const fileName = `${userId}/${Date.now()}.jpg`;
-      const { data, error } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, blob, { upsert: true });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      onUploadSuccess(urlData.publicUrl);
+      // 建立 Firebase Storage 引用
+      const storageRef = ref(storage, `avatars/${userId}/${Date.now()}.jpg`);
+      
+      // 上傳檔案
+      const snapshot = await uploadBytes(storageRef, blob);
+      
+      // 獲取下載網址
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      onUploadSuccess(downloadURL);
       setImage(null);
     } catch (err) {
-      console.error('Error uploading avatar:', err);
+      console.error('Error uploading avatar to Firebase:', err);
       alert('上傳失敗，請稍後再試');
     } finally {
       setIsUploading(false);
@@ -89,7 +92,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ userId, onUploadSuccess, cu
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative group cursor-pointer">
-        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-poker-gold/30 overflow-hidden bg-slate-800 flex items-center justify-center shadow-2xl transition-all group-hover:border-poker-gold">
+        <div className="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-brand-gold/30 overflow-hidden bg-slate-800 flex items-center justify-center shadow-2xl transition-all group-hover:border-brand-gold">
           {currentAvatarUrl ? (
             <img src={currentAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
@@ -122,12 +125,12 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({ userId, onUploadSuccess, cu
             <button onClick={() => setImage(null)} className="flex-1 py-4 bg-white/5 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-white/10">
               <X className="w-5 h-5" /> 取消
             </button>
-            <button onClick={handleUpload} disabled={isUploading} className="flex-1 py-4 bg-poker-gold text-poker-green rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 disabled:opacity-50">
+            <button onClick={handleUpload} disabled={isUploading} className="flex-1 py-4 bg-brand-gold text-brand-green rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl hover:bg-yellow-500 disabled:opacity-50">
               {isUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Check className="w-5 h-5" /> 確定裁切</>}
             </button>
           </div>
           <div className="mt-6 w-full max-w-md">
-            <input type="range" value={zoom} min={1} max={3} step={0.1} aria-labelledby="Zoom" onChange={(e) => setZoom(Number(e.target.value))} className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-poker-gold" />
+            <input type="range" value={zoom} min={1} max={3} step={0.1} aria-labelledby="Zoom" onChange={(e) => setZoom(Number(e.target.value))} className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-brand-gold" />
             <p className="text-center text-slate-500 text-[10px] mt-2 uppercase tracking-widest">滑動調整縮放</p>
           </div>
         </div>
