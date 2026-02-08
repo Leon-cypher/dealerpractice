@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
-import { Camera, Upload, X, Check } from 'lucide-react';
+import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
 import { supabase } from '../App'; // 引用主程式的 supabase client
 
 interface AvatarUploadProps {

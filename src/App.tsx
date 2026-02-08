@@ -89,6 +89,7 @@ const App: React.FC = () => {
   const [challengeTimeLeft, setChallengeTimeLeft] = useState(300);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRankModal, setShowRankModal] = useState(false);
+  const [playerName, setPlayerName] = useState("");
   const [activeRankTab, setActiveRankTab] = useState<LeaderboardType>('SPLIT_POT');
   const [finalScore, setFinalScore] = useState(0);
   const [finalStreak, setFinalStreak] = useState(0);
