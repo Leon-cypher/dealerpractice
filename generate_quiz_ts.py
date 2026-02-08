@@ -17,19 +17,20 @@ export const QUIZ_DATA: Question[] = """
 
 formatted_data = []
 for q in data:
+    # 強制將所有內容轉換為字串，除了 ID
     formatted_data.append({
-        'id': q['編號'],
-        'category': q['類別'],
-        'difficulty': q['難度'],
-        'question': q['題目'],
+        'id': int(q['編號']),
+        'category': str(q['類別']),
+        'difficulty': str(q['難度']),
+        'question': str(q['題目']),
         'options': {
-            'A': q['選項A'],
-            'B': q['選項B'],
-            'C': q['選項C'],
-            'D': q['選項D']
+            'A': str(q['選項A']),
+            'B': str(q['選項B']),
+            'C': str(q['選項C']),
+            'D': str(q['選項D'])
         },
-        'answer': q['正確答案'],
-        'explanation': q['解析']
+        'answer': str(q['正確答案']),
+        'explanation': str(q['解析'])
     })
 
 ts_content += json.dumps(formatted_data, ensure_ascii=False, indent=2) + ";"
@@ -37,4 +38,4 @@ ts_content += json.dumps(formatted_data, ensure_ascii=False, indent=2) + ";"
 with open('src/utils/quizData.ts', 'w', encoding='utf-8') as f:
     f.write(ts_content)
 
-print("Success: Generated src/utils/quizData.ts")
+print("Success: Fixed and regenerated src/utils/quizData.ts")
