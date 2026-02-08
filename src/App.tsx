@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import * as PotCalc from './utils/potCalculator';
 import * as PokerLogic from './utils/pokerLogic';
 import { createClient } from '@supabase/supabase-js';
-import { Trophy, RefreshCw, CheckCircle2, XCircle, Info, Users, Coins, ArrowRight, Wallet, Medal, Eye, Calculator, Star, Flame, Loader2 } from 'lucide-react';
+import { 
+  Trophy, RefreshCw, XCircle, Info, Users, Coins, 
+  ArrowRight, Medal, Eye, Calculator, Star, Flame, Loader2 
+} from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -21,31 +24,14 @@ type MainMode = 'SPLIT_POT' | 'SHOWDOWN';
 const PokerCard: React.FC<{ card: PokerLogic.Card; hidden?: boolean; className?: string; style?: React.CSSProperties; mini?: boolean }> = ({ card, hidden, className, style, mini }) => {
   if (hidden) {
     return (
-      <div 
-        style={style}
-        className={cn("poker-card bg-slate-900 border-slate-700", className)}
-      >
+      <div style={style} className={cn("poker-card bg-slate-900 border-slate-700", className)}>
         <div className="text-slate-700 font-black text-xl">?</div>
       </div>
     );
   }
-
-  const suitSymbol = {
-    'spades': '♠',
-    'hearts': '♥',
-    'diamonds': '♦',
-    'clubs': '♣'
-  }[card.suit];
-  
+  const suitSymbol = { 'spades': '♠', 'hearts': '♥', 'diamonds': '♦', 'clubs': '♣' }[card.suit];
   return (
-    <div 
-      style={style}
-      className={cn(
-        mini ? "mini-card" : "poker-card",
-        card.suit,
-        className
-      )}
-    >
+    <div style={style} className={cn(mini ? "mini-card" : "poker-card", card.suit, className)}>
       <div className={mini ? "" : "text-lg md:text-xl"}>{card.rank}</div>
       {!mini && <div className="text-[10px] md:text-xs opacity-80">{suitSymbol}</div>}
       {mini && <span className="ml-0.5">{suitSymbol}</span>}
@@ -72,11 +58,11 @@ interface ShowdownScenario {
 }
 
 const App: React.FC = () => {
+  // --- All States ---
   const [mode, setMode] = useState<MainMode>('SPLIT_POT');
   const [variant, setVariant] = useState<PokerLogic.GameVariant>('HOLDEM');
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
-  
   const [potPlayers, setPotPlayers] = useState<PotCalc.Player[]>([]);
   const [stage, setStage] = useState<'POTS' | 'PAYOUTS'>('POTS');
   const [potAnswers, setPotAnswers] = useState<Record<string, string>>({});
@@ -84,18 +70,15 @@ const App: React.FC = () => {
   const [showPotResult, setShowPotResult] = useState(false);
   const [correctPots, setCorrectPots] = useState<PotCalc.PotStage[]>([]);
   const [correctPayouts, setCorrectPayouts] = useState<Record<number, number>>({});
-
   const [showdown, setShowdown] = useState<ShowdownScenario | null>(null);
   const [userHighWinnerIds, setUserHighWinnerIds] = useState<number[]>([]);
   const [userLowWinnerIds, setUserLowWinnerIds] = useState<number[]>([]);
   const [showShowdownResult, setShowShowdownResult] = useState(false);
-
-  // --- Leaderboard & Scoring States ---
-  const [startTime, setStartTime] = useState<number>(0);
+  const [isChallengeActive, setIsChallengeActive] = useState(false);
+  const [challengeTimeLeft, setChallengeTimeLeft] = useState(300);
+  const [startTime, setStartTime] = useState<number>(Date.now());
   const [totalScore, setTotalScore] = useState<number>(0);
   const [lastPoints, setLastPoints] = useState<number>(0);
-
-  // --- Leaderboard Modals ---
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showRankModal, setShowRankModal] = useState(false);
   const [playerName, setPlayerName] = useState("");
@@ -106,66 +89,93 @@ const App: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingRank, setIsLoadingRank] = useState(false);
 
-  const fetchLeaderboard = async () => {
-    setIsLoadingRank(true);
-    try {
-      const { data, error } = await supabase
-        .from('leaderboard')
-        .select('*')
-        .order('score', { ascending: false })
-        .limit(10);
-      if (data) {
-        setLeaderboard(data);
-        // 如果滿 10 人，第 10 名的分數就是門檻；如果不滿 10 人，門檻就是 0
-        if (data.length >= 10) {
-          setMinHighScore(data[9].score);
-        } else {
-          setMinHighScore(0);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoadingRank(false);
-    }
+  // --- Helpers ---
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    fetchLeaderboard();
+  const fetchLeaderboard = useCallback(async () => {
+    setIsLoadingRank(true);
+    try {
+      const { data } = await supabase.from('leaderboard').select('*').order('score', { ascending: false }).limit(10);
+      if (data) {
+        setLeaderboard(data);
+        setMinHighScore(data.length >= 10 ? data[9].score : 0);
+      }
+    } catch (err) { console.error(err); }
+    finally { setIsLoadingRank(false); }
   }, []);
 
-  const handleSubmitScore = async () => {
-    if (!playerName.trim()) return;
-    setIsSubmitting(true);
-    try {
-      const { error } = await supabase.from('leaderboard').insert([
-        { name: playerName, score: finalScore, streak: finalStreak }
-      ]);
-      if (!error) {
-        setShowSubmitModal(false);
-        setPlayerName("");
-        setTotalScore(0);
-        fetchLeaderboard();
-        setShowRankModal(true);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
+  const initSplitPot = useCallback(() => {
+    const players = PotCalc.generateRandomScenario();
+    const pots = PotCalc.calculatePots(players);
+    setPotPlayers(players);
+    setCorrectPots(pots);
+    setCorrectPayouts(PotCalc.calculatePayouts(players, pots));
+    setPotAnswers({});
+    setPayoutAnswers({});
+    setShowPotResult(false);
+    setStage('POTS');
+    setStartTime(Date.now());
+  }, []);
+
+  const initShowdown = useCallback(() => {
+    const scenario = PokerLogic.generateShowdownScenario(Math.random() > 0.5 ? 2 : 3, variant) as ShowdownScenario;
+    setShowdown(scenario);
+    setUserHighWinnerIds([]);
+    setUserLowWinnerIds([]);
+    setShowShowdownResult(false);
+    setStartTime(Date.now());
+  }, [variant]);
+
+  // --- Effects ---
+  useEffect(() => { fetchLeaderboard(); }, [fetchLeaderboard]);
+
+  useEffect(() => {
+    if (mode === 'SPLIT_POT') initSplitPot();
+    else initShowdown();
+  }, [mode, variant, initSplitPot, initShowdown]);
+
+  useEffect(() => {
+    let timer: any;
+    if (isChallengeActive && challengeTimeLeft > 0) {
+      timer = setInterval(() => { setChallengeTimeLeft(prev => prev - 1); }, 1000);
     }
+    return () => clearInterval(timer);
+  }, [isChallengeActive, challengeTimeLeft]);
+
+  useEffect(() => {
+    if (isChallengeActive && challengeTimeLeft === 0) {
+      setIsChallengeActive(false);
+      if (totalScore > 0 && totalScore > minHighScore) {
+        setFinalScore(totalScore);
+        setFinalStreak(streak);
+        setShowSubmitModal(true);
+      } else {
+        alert(`挑戰結束！最終得分：${totalScore.toLocaleString()}\n未進入前 10 名，再接再厲！`);
+        setTotalScore(0); setStreak(0);
+      }
+    }
+  }, [challengeTimeLeft, isChallengeActive, totalScore, minHighScore, streak]);
+
+  const startChallenge = () => {
+    setIsChallengeActive(true);
+    setChallengeTimeLeft(300);
+    setTotalScore(0);
+    setStreak(0);
+    setLastPoints(0);
+    if (mode === 'SPLIT_POT') initSplitPot();
+    else initShowdown();
   };
 
   const calculatePoints = (basePoints: number) => {
     const duration = (Date.now() - startTime) / 1000;
-    let timeMultiplier = 1.0;
-    
-    if (duration <= 10) timeMultiplier = 1.5;
-    else if (duration <= 15) timeMultiplier = 1.25;
-    
+    const timeMultiplier = duration <= 10 ? 1.5 : (duration <= 15 ? 1.25 : 1.0);
     const difficultyMap = { 'HOLDEM': 1, 'OMAHA': 1.5, 'BIGO': 2 };
     const diffMultiplier = difficultyMap[variant] || 1;
-    const streakMultiplier = 1 + (streak * 0.1);
-    
+    const streakMultiplier = 1 + (streak * 0.2);
     const points = Math.round(basePoints * diffMultiplier * timeMultiplier * streakMultiplier);
     setLastPoints(points);
     setTotalScore(prev => prev + points);
@@ -181,205 +191,69 @@ const App: React.FC = () => {
         return next;
       });
     } else {
-      // 只有分數超過第 10 名門檻，且分數大於 0 時才跳出登錄視窗
-      if (totalScore > 0 && totalScore > minHighScore) {
-        setFinalScore(totalScore);
-        setFinalStreak(streak);
-        setShowSubmitModal(true);
-      }
+      if (!isChallengeActive) setTotalScore(0);
       setStreak(0);
-      setTotalScore(0);
       setLastPoints(0);
     }
   };
 
-  const initSplitPot = () => {
-    const players = PotCalc.generateRandomScenario();
-    const pots = PotCalc.calculatePots(players);
-    setPotPlayers(players);
-    setCorrectPots(pots);
-    setCorrectPayouts(PotCalc.calculatePayouts(players, pots));
-    setPotAnswers({});
-    setPayoutAnswers({});
-    setShowPotResult(false);
-    setStage('POTS');
-    setStartTime(Date.now());
+  const handleSubmitScore = async () => {
+    if (!playerName.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.from('leaderboard').insert([{ name: playerName, score: finalScore, streak: finalStreak }]);
+      if (!error) { setShowSubmitModal(false); setPlayerName(""); fetchLeaderboard(); setShowRankModal(true); }
+    } catch (err) { console.error(err); }
+    finally { setIsSubmitting(false); }
   };
 
-  const initShowdown = () => {
-    const playerCount = Math.random() > 0.5 ? 2 : 3;
-    const scenario = PokerLogic.generateShowdownScenario(playerCount, variant);
-    setShowdown(scenario);
-    setUserHighWinnerIds([]);
-    setUserLowWinnerIds([]);
-    setShowShowdownResult(false);
-    setStartTime(Date.now());
-  };
-
-  useEffect(() => {
-    if (mode === 'SPLIT_POT') initSplitPot();
-    else initShowdown();
-  }, [mode, variant]);
-
+  // --- Renders ---
   const renderSplitPot = () => {
-    const isPotCorrect = (potName: string) => parseInt(potAnswers[potName] || '0') === correctPots.find(p => p.name === potName)?.amount;
-    const isPayoutCorrect = (playerId: number) => Number(payoutAnswers[playerId] || 0) === correctPayouts[playerId];
     const allPotsCorrect = correctPots.every(pot => parseInt(potAnswers[pot.name] || '0') === pot.amount);
     const allPayoutsCorrect = potPlayers.every(p => Number(payoutAnswers[p.id] || 0) === correctPayouts[p.id]);
-
-    const handlePotCheck = () => {
-      setShowPotResult(true);
-      if (!allPotsCorrect) {
-        updateStreak(false);
-      } else {
-        updateStreak(true, 500);
-      }
-    };
-
-    const handlePayoutCheck = () => {
-      setShowPotResult(true);
-      updateStreak(allPayoutsCorrect, 1000);
-    };
-
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          <div className="bg-black/40 border border-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2rem] backdrop-blur-md shadow-2xl relative overflow-hidden">
-            <h2 className="text-[8px] md:text-[10px] font-black text-poker-gold uppercase tracking-[0.2em] md:tracking-[0.4em] mb-4 md:mb-6 flex items-center gap-2">
-              <Users className="w-3 h-3" /> 玩家下注詳情
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-              {potPlayers.map(player => (
-                <div key={player.id} className="bg-white/5 border border-white/10 p-3 md:p-5 rounded-xl md:rounded-2xl flex justify-between items-center">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className="relative">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-black text-lg md:text-xl">
-                        {player.name.slice(-1)}
-                      </div>
-                      {player.isAllIn && <div className="absolute -top-1 -right-1 bg-red-600 text-[6px] font-black px-1 rounded-sm border border-white/20 uppercase">ALL IN</div>}
-                    </div>
-                    <div>
-                      <div className="text-slate-200 text-sm md:text-base font-bold">{player.name}</div>
-                      <div className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Active</div>
-                    </div>
+          <div className="bg-black/40 border border-white/5 p-4 md:p-6 rounded-[2rem] shadow-2xl relative overflow-hidden">
+            <h2 className="text-[8px] font-black text-poker-gold uppercase tracking-[0.4em] mb-6 flex items-center gap-2"><Users className="w-3 h-3" /> 玩家下注詳情</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {potPlayers.map(p => (
+                <div key={p.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-white font-black text-xl">{p.name.slice(-1)}</div>
+                    <div><div className="text-slate-200 font-bold">{p.name}</div><div className="text-[8px] text-slate-500 uppercase">Active</div></div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xl md:text-2xl font-black font-mono text-white tracking-tighter">
-                      <span className="text-poker-gold/50 text-xs md:text-sm mr-0.5">$</span>
-                      {player.bet.toLocaleString()}
-                    </div>
-                    {stage === 'PAYOUTS' && <div className={cn("text-[8px] font-black px-1.5 py-0.5 rounded mt-1 inline-block uppercase", player.rank === 1 ? "bg-green-500 text-white" : "bg-white/10 text-slate-400")}>{player.rankName}</div>}
-                  </div>
+                  <div className="text-right"><div className="text-2xl font-black font-mono text-white">${p.bet.toLocaleString()}</div>{stage === 'PAYOUTS' && <div className="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/10 text-slate-400 uppercase">{p.rankName}</div>}</div>
                 </div>
               ))}
             </div>
           </div>
-
           {stage === 'PAYOUTS' && (
-            <div className="bg-gradient-to-r from-poker-gold/10 to-transparent border border-poker-gold/20 p-4 md:p-6 rounded-2xl md:rounded-[2rem] shadow-xl">
-              <h3 className="text-[8px] md:text-[10px] font-black text-poker-gold uppercase tracking-[0.2em] md:tracking-[0.4em] mb-4 flex items-center gap-2">
-                <Coins className="w-3 h-3" /> 已確認底池
-              </h3>
-              <div className="flex flex-wrap gap-2 md:gap-4">
-                {correctPots.map(pot => (
-                  <div key={pot.name} className="bg-black/60 border border-white/5 p-3 md:p-4 rounded-xl md:rounded-2xl min-w-[120px] md:min-w-[150px] shadow-lg relative">
-                    <div className="absolute top-2 right-2 flex gap-0.5">
-                      {pot.eligiblePlayerIds.map(id => (
-                        <div key={id} className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-poker-gold/20 border border-poker-gold/40 flex items-center justify-center text-[6px] md:text-[7px] text-poker-gold font-bold">
-                          {potPlayers.find(p => p.id === id)?.name.slice(-1)}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-[8px] md:text-[9px] text-slate-500 font-black uppercase tracking-widest mb-0.5 md:mb-1">{pot.name}</div>
-                    <div className="text-lg md:text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div>
-                  </div>
-                ))}
-              </div>
+            <div className="bg-gradient-to-r from-poker-gold/10 to-transparent border border-poker-gold/20 p-6 rounded-[2rem] shadow-xl">
+              <h3 className="text-[8px] font-black text-poker-gold uppercase mb-4 flex items-center gap-2"><Coins className="w-3 h-3" /> 已確認底池</h3>
+              <div className="flex flex-wrap gap-4">{correctPots.map(pot => (<div key={pot.name} className="bg-black/60 p-4 rounded-2xl min-w-[150px]"><div className="text-[8px] text-slate-500 uppercase mb-1">{pot.name}</div><div className="text-2xl font-black font-mono text-poker-gold">${pot.amount.toLocaleString()}</div></div>))}</div>
             </div>
           )}
         </div>
-
-        <div className="space-y-4 md:space-y-6">
-          <div className="bg-slate-900 border-2 border-poker-gold/40 p-5 md:p-8 rounded-2xl md:rounded-[3rem] shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-poker-gold to-transparent"></div>
-            
-            {stage === 'POTS' ? (
-              <div className="space-y-4 md:space-y-6">
-                <div className="text-center">
-                  <h2 className="text-lg md:text-xl font-black text-white uppercase">底池金額核算</h2>
-                  <div className="h-0.5 w-8 bg-poker-gold mx-auto mt-1 md:mt-2"></div>
-                </div>
-                
-                <div className="space-y-4 md:space-y-6">
-                  {correctPots.map((pot) => (
-                    <div key={pot.name} className="relative">
-                      <label className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">{pot.name} 金額</label>
-                      <div className="relative group">
-                        <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-poker-gold/40 font-mono text-lg md:text-xl">$</span>
-                        <input type="number" disabled={showPotResult} value={potAnswers[pot.name] || ''} onChange={(e) => setPotAnswers(prev => ({ ...prev, [pot.name]: e.target.value }))} className={cn("w-full bg-black/50 border-2 rounded-xl md:rounded-2xl p-3 md:p-5 pl-8 md:pl-10 font-mono text-xl md:text-2xl text-white outline-none transition-all", showPotResult ? (isPotCorrect(pot.name) ? "border-green-500 text-green-400 bg-green-500/5" : "border-red-500 text-red-400 bg-red-500/5") : "border-white/10 focus:border-poker-gold")} placeholder="0" />
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {!showPotResult ? (
-                    <button onClick={handlePotCheck} className="w-full bg-poker-gold text-poker-green font-black py-4 md:py-5 rounded-xl md:rounded-2xl shadow-xl active:scale-95 transition-all uppercase tracking-widest text-xs">核對金額</button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className={cn("p-3 md:p-4 rounded-xl md:rounded-2xl text-center font-black border-2 text-xs md:text-sm uppercase animate-in zoom-in duration-300", allPotsCorrect ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>{allPotsCorrect ? "計算正確" : "計算錯誤"}</div>
-                      {allPotsCorrect && <button onClick={() => {setStage('PAYOUTS'); setShowPotResult(false);}} className="w-full bg-white text-poker-green font-black py-4 md:py-5 rounded-xl md:rounded-2xl flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 transition-all uppercase tracking-widest text-xs">進入分配階段 <ArrowRight className="w-4 h-4" /></button>}
-                      {!allPotsCorrect && <button onClick={() => setShowPotResult(false)} className="w-full bg-white/5 text-slate-400 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest">重新輸入</button>}
-                    </div>
-                  )}
-                </div>
-              </div>
+        <div className="bg-slate-900 border-2 border-poker-gold/40 p-8 rounded-[3rem] shadow-2xl space-y-6">
+          <h2 className="text-xl font-black text-white text-center uppercase">{stage === 'POTS' ? '底池金額核算' : '分配底池結果'}</h2>
+          <div className="space-y-4">
+            {stage === 'POTS' ? correctPots.map(pot => (
+              <div key={pot.name}><label className="text-[8px] text-slate-500 uppercase ml-1">{pot.name} 金額</label><input type="number" disabled={showPotResult} value={potAnswers[pot.name] || ''} onChange={e => setPotAnswers(prev => ({ ...prev, [pot.name]: e.target.value }))} className={cn("w-full bg-black/50 border-2 rounded-2xl p-5 font-mono text-2xl text-white", showPotResult ? (parseInt(potAnswers[pot.name]||'0')===pot.amount?"border-green-500":"border-red-500"):"border-white/10")} /></div>
+            )) : (
+              <>
+                <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex gap-3 items-start"><Info className="w-4 h-4 text-blue-400 shrink-0" /><div className="text-[10px] text-blue-300 italic">餘數應分給 ID 較小的贏家。</div></div>
+                {potPlayers.map(p => (
+                  <div key={p.id}><label className="text-[8px] text-slate-500 uppercase ml-1">{p.name} 獲配總額</label><input type="number" disabled={showPotResult} value={payoutAnswers[p.id] || ''} onChange={e => setPayoutAnswers(prev => ({ ...prev, [p.id]: e.target.value }))} className={cn("w-full bg-black/50 border-2 rounded-2xl p-5 font-mono text-2xl text-white", showPotResult ? (Number(payoutAnswers[p.id]||0)===correctPayouts[p.id]?"border-green-500":"border-red-500"):"border-white/10")} /></div>
+                ))}
+              </>
+            )}
+            {!showPotResult ? (
+              <button onClick={() => {setShowPotResult(true); updateStreak(stage === 'POTS' ? allPotsCorrect : allPayoutsCorrect, stage === 'POTS' ? 500 : 1000);}} className="w-full bg-poker-gold text-poker-green font-black py-5 rounded-2xl uppercase shadow-xl">核對結果</button>
             ) : (
-              <div className="space-y-4 md:space-y-6">
-                <div className="text-center">
-                  <h2 className="text-lg md:text-xl font-black text-white uppercase">分配底池結果</h2>
-                  <div className="h-0.5 w-8 bg-poker-gold mx-auto mt-1 md:mt-2"></div>
-                </div>
-
-                <div className="space-y-4 md:space-y-6">
-                  {stage === 'PAYOUTS' && (
-                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl flex gap-3 items-start">
-                      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                      <div className="text-[10px] text-blue-300 leading-relaxed">
-                        <span className="font-bold text-blue-400 block mb-1">專業荷官小撇步：</span>
-                        若底池無法整除，多出的零錢 (Odd Chips) 應由<b>按鈕位 (Button) 順時針方向第一位</b>贏家獲得。在此練習中，請分給 ID 較小的贏家。
-                      </div>
-                    </div>
-                  )}
-                  {potPlayers.map((p) => (
-                    <div key={p.id} className="relative">
-                      <label className="text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">{p.name} 獲配總額</label>
-                      <div className="relative group">
-                        <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-poker-gold/40 font-mono text-lg md:text-xl">$</span>
-                        <input type="number" disabled={showPotResult} value={payoutAnswers[p.id] || ''} onChange={(e) => setPayoutAnswers(prev => ({ ...prev, [p.id]: e.target.value }))} className={cn("w-full bg-black/50 border-2 rounded-xl md:rounded-2xl p-3 md:p-5 pl-8 md:pl-10 font-mono text-xl md:text-2xl text-white outline-none transition-all", showPotResult ? (isPayoutCorrect(p.id) ? "border-green-500 text-green-400 bg-green-500/5" : "border-red-500 text-red-400 bg-red-500/5") : "border-white/10 focus:border-poker-gold")} placeholder="0" />
-                      </div>
-                    </div>
-                  ))}
-
-                  {!showPotResult ? (
-                    <button onClick={handlePayoutCheck} className="w-full bg-poker-gold text-poker-green font-black py-4 md:py-5 rounded-xl md:rounded-2xl shadow-lg active:scale-95 transition-all uppercase tracking-widest text-xs">核對分配結果</button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className={cn("p-3 md:p-4 rounded-xl md:rounded-2xl text-center font-black border-2 text-xs md:text-sm uppercase", allPayoutsCorrect ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-400 border-red-500/20")}>{allPayoutsCorrect ? "分配成功" : "分配失敗"}</div>
-                      {!allPayoutsCorrect && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button onClick={() => setShowPotResult(false)} className="bg-white/5 text-slate-400 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all border border-white/10">重新輸入</button>
-                          <button onClick={() => {
-                            const answers: Record<number, string> = {};
-                            potPlayers.forEach(p => {
-                              answers[p.id] = correctPayouts[p.id].toString();
-                            });
-                            setPayoutAnswers(answers);
-                          }} className="bg-blue-600/20 text-blue-400 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600/30 transition-all border border-blue-600/30">顯示解答</button>
-                        </div>
-                      )}
-                      <button onClick={initSplitPot} className="w-full bg-white/10 text-white font-black py-4 md:py-5 rounded-xl md:rounded-2xl hover:bg-white/20 transition-all uppercase tracking-widest text-xs">{allPayoutsCorrect ? "下一題練習" : "放棄並換題"}</button>
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-3">
+                {(stage === 'POTS' && allPotsCorrect) && <button onClick={() => {setStage('PAYOUTS'); setShowPotResult(false);}} className="w-full bg-white text-poker-green font-black py-5 rounded-2xl shadow-xl">下一步</button>}
+                <button onClick={initSplitPot} className="w-full bg-white/10 text-white font-black py-5 rounded-2xl hover:bg-white/20">下一題</button>
               </div>
             )}
           </div>
@@ -391,80 +265,35 @@ const App: React.FC = () => {
   const renderShowdown = () => {
     if (!showdown) return null;
     const isHiLo = variant === 'BIGO';
-    const actualHighWinners = showdown.players.filter((p: any) => p.isHighWinner).map((p: any) => p.id);
-    const actualLowWinners = showdown.players.filter((p: any) => p.isLowWinner).map((p: any) => p.id);
-    const hasLow = actualLowWinners.length > 0;
-    const highCorrect = userHighWinnerIds.length === actualHighWinners.length && userHighWinnerIds.every(id => actualHighWinners.includes(id));
-    const lowCorrect = !isHiLo ? true : (!hasLow ? userLowWinnerIds.length === 0 : (userLowWinnerIds.length === actualLowWinners.length && userLowWinnerIds.every(id => actualLowWinners.includes(id))));
-    const isCorrect = highCorrect && lowCorrect;
-
+    const actualHighWinners = showdown.players.filter(p => p.isHighWinner).map(p => p.id);
+    const actualLowWinners = showdown.players.filter(p => p.isLowWinner).map(p => p.id);
+    const isCorrect = userHighWinnerIds.length === actualHighWinners.length && userHighWinnerIds.every(id => actualHighWinners.includes(id)) && (!isHiLo || (userLowWinnerIds.length === actualLowWinners.length && userLowWinnerIds.every(id => actualLowWinners.includes(id))));
     return (
-      <div className="space-y-6 md:space-y-8 animate-in fade-in zoom-in duration-500">
-        <div className="bg-black/40 border border-poker-gold/30 p-4 md:p-8 rounded-2xl md:rounded-[2rem] shadow-2xl relative">
-          <h2 className="text-center text-poker-gold font-black tracking-[0.2em] uppercase mb-4 opacity-50 text-[8px] md:text-[10px]">Community Cards</h2>
-          <div className="flex justify-center gap-1.5 md:gap-3 mb-6 md:mb-8 overflow-x-auto pb-2 px-2">
-            {showdown.communityCards.map((card: any, i: number) => (
-              <PokerCard key={i} card={card} mini />
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {showdown.players.map((player: any) => (
-              <div key={player.id} className={cn(
-                "p-3 md:p-4 rounded-xl border-2 flex flex-col items-center gap-2 md:gap-3 transition-all",
-                (userHighWinnerIds.includes(player.id) || userLowWinnerIds.includes(player.id)) ? "bg-poker-gold/10 border-poker-gold" : "bg-white/5 border-white/5"
-              )}>
-                <div className="font-bold text-white text-sm md:text-base">{player.name}</div>
-                <div className="flex flex-wrap justify-center gap-1 mb-1">
-                  {player.cards.map((card: any, i: number) => (
-                    <PokerCard key={i} card={card} mini />
-                  ))}
-                </div>
+      <div className="space-y-8 animate-in fade-in zoom-in duration-500">
+        <div className="bg-black/40 border border-poker-gold/30 p-8 rounded-[2rem] shadow-2xl">
+          <div className="flex justify-center gap-3 mb-8">{showdown.communityCards.map((card, i) => (<PokerCard key={i} card={card} mini />))}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {showdown.players.map(p => (
+              <div key={p.id} className={cn("p-4 rounded-xl border-2 flex flex-col items-center gap-3 transition-all", (userHighWinnerIds.includes(p.id) || userLowWinnerIds.includes(p.id)) ? "bg-poker-gold/10 border-poker-gold" : "bg-white/5 border-white/5")}>
+                <div className="font-bold text-white">{p.name}</div>
+                <div className="flex gap-1">{p.cards.map((card, i) => (<PokerCard key={i} card={card} mini />))}</div>
                 <div className="flex gap-2 w-full">
-                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(player.id) ? prev.filter(x => x !== player.id) : [...prev, player.id])} className={cn("flex-1 py-1.5 md:py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition-all", userHighWinnerIds.includes(player.id) ? "bg-poker-gold text-poker-green" : "bg-white/10 text-slate-400")}>
-                    {isHiLo ? "高牌贏家" : "贏家"}
-                  </button>
-                  {isHiLo && <button onClick={() => !showShowdownResult && setUserLowWinnerIds(prev => prev.includes(player.id) ? prev.filter(x => x !== player.id) : [...prev, player.id])} className={cn("flex-1 py-1.5 md:py-2 rounded-lg text-[8px] md:text-[10px] font-bold uppercase transition-all", userLowWinnerIds.includes(player.id) ? "bg-blue-500 text-white shadow-lg" : "bg-white/10 text-slate-400")}>低牌贏家</button>}
+                  <button onClick={() => !showShowdownResult && setUserHighWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all", userHighWinnerIds.includes(p.id) ? "bg-poker-gold text-poker-green" : "bg-white/10 text-slate-400")}>{isHiLo ? "高牌贏家" : "贏家"}</button>
+                  {isHiLo && <button onClick={() => !showShowdownResult && setUserLowWinnerIds(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} className={cn("flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all", userLowWinnerIds.includes(p.id) ? "bg-blue-500 text-white shadow-lg" : "bg-white/10 text-slate-400")}>低牌贏家</button>}
                 </div>
                 {showShowdownResult && (
-                  <div className="mt-2 w-full space-y-2">
-                    <div className={cn(
-                      "text-[10px] font-bold p-2 rounded text-center border transition-all", 
-                      player.isHighWinner 
-                        ? "bg-green-500/20 text-green-400 border-green-500/50 shadow-[0_0_10px_rgba(34,197,94,0.3)]" 
-                        : "bg-slate-800/50 text-slate-500 border-slate-700"
-                    )}>
-                      <div className="text-[8px] uppercase opacity-60 mb-0.5">
-                        {isHiLo ? "最佳高牌組合" : "最佳組合"}
-                      </div>
-                      {player.handDescription}
-                    </div>
-                    {isHiLo && (
-                      <div className={cn(
-                        "text-[10px] font-bold p-2 rounded text-center border transition-all", 
-                        player.isLowWinner 
-                          ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.3)]" 
-                          : "bg-slate-800/50 text-slate-500 border-slate-700"
-                      )}>
-                        <div className="text-[8px] uppercase opacity-60 mb-0.5">最佳低牌組合 (8-or-better)</div>
-                        {player.lowDescription}
-                      </div>
-                    )}
+                  <div className="mt-2 w-full space-y-2 text-center">
+                    <div className={cn("text-[10px] font-bold p-2 rounded border", p.isHighWinner ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-slate-800/50 text-slate-500")}>{p.handDescription}</div>
+                    {isHiLo && <div className={cn("text-[10px] font-bold p-2 rounded border", p.isLowWinner ? "bg-blue-500/20 text-blue-400 border-blue-500/50" : "bg-slate-800/50 text-slate-500")}>{p.lowDescription}</div>}
                   </div>
                 )}
               </div>
             ))}
           </div>
         </div>
-
-        <div className="max-w-md mx-auto space-y-4 text-center px-4">
-          {!showShowdownResult ? (
-            <button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect, 800);}} className="w-full bg-poker-gold text-poker-green font-black py-4 rounded-xl shadow-xl transition-all uppercase text-xs">確認分配結果</button>
-          ) : (
-            <div className="space-y-3">
-              <div className={cn("p-4 rounded-xl font-bold text-lg md:text-xl border-2", isCorrect ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>{isCorrect ? "判斷正確！" : "判斷錯誤。"}</div>
-              <button onClick={initShowdown} className="w-full bg-white text-poker-green font-black py-4 rounded-xl shadow-lg transition-all text-xs">下一題練習</button>
-            </div>
+        <div className="max-w-md mx-auto space-y-4">
+          {!showShowdownResult ? (<button disabled={userHighWinnerIds.length === 0} onClick={() => {setShowShowdownResult(true); updateStreak(isCorrect, 800);}} className="w-full bg-poker-gold text-poker-green font-black py-4 rounded-xl uppercase shadow-xl">確認結果</button>) : (
+            <div className="space-y-3"><div className={cn("p-4 rounded-xl font-bold text-center border-2 text-lg", isCorrect ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50")}>{isCorrect ? "判斷正確！" : "判斷錯誤。"}</div><button onClick={initShowdown} className="w-full bg-white text-poker-green font-black py-4 rounded-xl shadow-lg">下一題</button></div>
           )}
         </div>
       </div>
@@ -474,183 +303,80 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-poker-green text-white p-3 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-          <div className="flex items-center gap-3 bg-black/40 px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl border border-white/10 shadow-lg w-full sm:w-auto justify-between sm:justify-start">
-            <div className="flex flex-col items-center border-r border-white/20 pr-3 md:pr-4">
-              <span className="text-[8px] md:text-[10px] text-poker-gold font-bold uppercase tracking-widest">Points</span>
-              <div className="flex items-center gap-1 text-poker-gold"><Coins className="w-3 h-3 md:w-4 md:h-4" /><span className="text-xl md:text-2xl font-black">{totalScore.toLocaleString()}</span></div>
-              {lastPoints > 0 && <div className="text-[8px] text-green-400 font-bold animate-bounce">+{lastPoints}</div>}
-            </div>
-            <div className="flex flex-col items-center border-r border-white/20 px-3 md:px-4">
-              <span className="text-[8px] md:text-[10px] text-poker-gold font-bold uppercase tracking-widest">Streak</span>
-              <div className="flex items-center gap-1"><Flame className={cn("w-4 h-4 md:w-5 md:h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-xl md:text-2xl font-black">{streak}</span></div>
-            </div>
-            <div className="flex flex-col items-center pl-1 md:pl-2">
-              <span className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-widest">Best</span>
-              <div className="flex items-center gap-1"><Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-500" /><span className="text-lg md:text-xl font-bold">{bestStreak}</span></div>
-            </div>
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <div className="flex items-center gap-3 bg-black/40 px-6 py-3 rounded-2xl border border-white/10 shadow-lg">
+            {isChallengeActive && (<div className="flex flex-col items-center border-r border-white/20 pr-4"><span className="text-[8px] text-red-400 font-bold uppercase animate-pulse">Time Left</span><div className="text-2xl font-black font-mono">{formatTime(challengeTimeLeft)}</div></div>)}
+            <div className="flex flex-col items-center border-r border-white/20 px-4"><span className="text-[8px] text-poker-gold font-bold uppercase">Points</span><div className="flex items-center gap-1 text-poker-gold"><Coins className="w-4 h-4" /><span className="text-2xl font-black">{totalScore.toLocaleString()}</span></div>{lastPoints > 0 && <div className="text-[8px] text-green-400 font-bold animate-bounce">+{lastPoints}</div>}</div>
+            <div className="flex flex-col items-center px-4"><span className="text-[8px] text-poker-gold font-bold uppercase">Streak</span><div className="flex items-center gap-1"><Flame className={cn("w-5 h-5", streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-600")} /><span className="text-2xl font-black">{streak}</span></div></div>
           </div>
-          
-          <div className="flex items-center gap-3 order-first sm:order-none w-full sm:w-auto justify-between">
-            <h1 className="text-xl md:text-2xl font-black text-poker-gold flex items-center gap-2"><Trophy className="w-5 h-5 md:w-6 md:h-6" /> DEALERPRO</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-black text-poker-gold flex items-center gap-2"><Trophy className="w-7 h-7" /> DEALERPRO</h1>
             <div className="flex gap-2">
-              <button onClick={() => { fetchLeaderboard(); setShowRankModal(true); }} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><Medal className="w-3 h-3 md:w-4 md:h-4 text-poker-gold" /> 排行榜</button>
-              <button onClick={mode === 'SPLIT_POT' ? initSplitPot : initShowdown} className="flex items-center gap-2 bg-poker-gold hover:bg-yellow-500 text-poker-green px-4 py-2 md:px-5 md:py-2.5 rounded-full font-bold transition-all shadow-lg text-[10px] md:text-sm"><RefreshCw className="w-3 h-3 md:w-4 md:h-4" /> 重新出題</button>
+              <button onClick={() => { fetchLeaderboard(); setShowRankModal(true); }} className="bg-white/10 px-5 py-2.5 rounded-full font-bold text-xs shadow-lg">排行榜</button>
+              {!isChallengeActive ? (<button onClick={startChallenge} className="bg-gradient-to-r from-red-600 to-orange-600 px-6 py-2.5 rounded-full font-black text-xs animate-bounce shadow-xl">🔥 開始挑戰 (5分鐘)</button>) : (<button onClick={() => {setIsChallengeActive(false); initSplitPot();}} className="bg-white/10 px-5 py-2.5 rounded-full font-bold text-xs">放棄</button>)}
             </div>
           </div>
         </div>
-
-        <div className="flex flex-col items-center mb-8 md:mb-10 gap-4">
-          <div className="bg-black/40 p-1 rounded-xl md:rounded-2xl flex border border-white/10 shadow-inner w-full sm:w-auto">
-            <button onClick={() => {setMode('SPLIT_POT'); setStreak(0);}} className={cn("flex-1 sm:flex-none px-4 md:px-6 py-2 md:py-3 rounded-lg md:rounded-xl flex items-center justify-center gap-2 font-bold transition-all text-xs md:text-sm", mode === 'SPLIT_POT' ? "bg-poker-gold text-poker-green shadow-lg" : "text-slate-400")}>
-              <Calculator className="w-4 h-4" /> 底池計算
-            </button>
-            <button onClick={() => {setMode('SHOWDOWN'); setStreak(0);}} className={cn("flex-1 sm:flex-none px-4 md:px-6 py-2 md:py-3 rounded-lg md:rounded-xl flex items-center justify-center gap-2 font-bold transition-all text-xs md:text-sm", mode === 'SHOWDOWN' ? "bg-poker-gold text-poker-green shadow-lg" : "text-slate-400")}>
-              <Eye className="w-4 h-4" /> 勝負判斷
-            </button>
+        <div className="flex flex-col items-center mb-10 gap-4">
+          <div className="bg-black/40 p-1 rounded-2xl flex border border-white/10">
+            <button onClick={() => {setMode('SPLIT_POT'); setStreak(0);}} className={cn("px-8 py-3 rounded-xl font-bold text-xs transition-all", mode === 'SPLIT_POT' ? "bg-poker-gold text-poker-green shadow-lg" : "text-slate-400")}>底池計算</button>
+            <button onClick={() => {setMode('SHOWDOWN'); setStreak(0);}} className={cn("px-8 py-3 rounded-xl font-bold text-xs transition-all", mode === 'SHOWDOWN' ? "bg-poker-gold text-poker-green shadow-lg" : "text-slate-400")}>勝負判斷</button>
           </div>
-
-          {mode === 'SHOWDOWN' && (
-            <div className="bg-white/5 p-1 rounded-lg flex border border-white/5 w-full sm:w-auto overflow-x-auto">
-              {(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (
-                <button key={v} onClick={() => {setVariant(v); setStreak(0);}} className={cn("flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] md:text-xs font-bold transition-all whitespace-nowrap", variant === v ? "bg-white/20 text-white" : "text-slate-500")}>{v}</button>
-              ))}
-            </div>
-          )}
+          {mode === 'SHOWDOWN' && (<div className="flex gap-2">{(['HOLDEM', 'OMAHA', 'BIGO'] as PokerLogic.GameVariant[]).map(v => (<button key={v} onClick={() => {setVariant(v); setStreak(0);}} className={cn("px-4 py-2 rounded-lg text-[10px] font-bold", variant === v ? "bg-white/20 text-white" : "text-slate-500")}>{v}</button>))}</div>)}
         </div>
-
-        {/* --- 功能說明導引 --- */}
-        <div className="max-w-4xl mx-auto mb-8 animate-in fade-in slide-in-from-top-2 duration-700">
-          {mode === 'SPLIT_POT' ? (
-            <div className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-2xl flex gap-4 md:gap-6 items-center">
-              <div className="hidden sm:flex bg-poker-gold/20 p-4 rounded-2xl items-center justify-center">
-                <Calculator className="w-8 h-8 text-poker-gold" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-poker-gold font-black text-sm md:text-base flex items-center gap-2 uppercase tracking-wider">
-                  <Calculator className="w-4 h-4 sm:hidden" /> 底池分配練習 (Split Pot)
-                </h3>
-                <p className="text-xs md:text-sm text-slate-400 leading-relaxed">
-                  模擬多位玩家 All-in 的複雜情境。你的任務是：
-                  <span className="block mt-1">1. <b>核算底池</b>：計算主池 (Main Pot) 與各個邊池 (Side Pot) 的正確金額。</span>
-                  <span className="block">2. <b>分配籌碼</b>：根據玩家的勝負排名，將底池準確分配給贏家。注意餘數 (Odd Chips) 的處理規則。</span>
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white/5 border border-white/10 p-4 md:p-6 rounded-2xl flex gap-4 md:gap-6 items-center">
-              <div className="hidden sm:flex bg-blue-500/20 p-4 rounded-2xl items-center justify-center">
-                <Eye className="w-8 h-8 text-blue-400" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-blue-400 font-black text-sm md:text-base flex items-center gap-2 uppercase tracking-wider">
-                  <Eye className="w-4 h-4 sm:hidden" /> 勝負判斷練習 (Showdown)
-                </h3>
-                <p className="text-xs md:text-sm text-slate-400 leading-relaxed">
-                  鍛鍊辨識牌型與判斷贏家的速度。
-                  <span className="block mt-1">1. <b>觀察牌組</b>：結合 5 張公牌與玩家手牌，找出最強組合。</span>
-                  <span className="block">2. <b>標記贏家</b>：點擊玩家下方的按鈕標記高牌贏家。</span>
-                  
-                  {/* 動態規則提示 */}
-                  <span className="block mt-3 p-2 bg-blue-500/10 border-l-2 border-blue-500 text-[10px] md:text-xs">
-                    {variant === 'HOLDEM' && (
-                      <span className="text-blue-300"><b>德州撲克規則：</b>可從 2 張手牌與 5 張公牌中，任意挑選 5 張組成最強牌型。</span>
-                    )}
-                    {variant === 'OMAHA' && (
-                      <span className="text-blue-300"><b>奧馬哈規則：</b><b className="text-white underline">強制 2+3</b>。必須且只能從 4 張手牌中選 2 張，搭配公牌中的 3 張組成牌型。</span>
-                    )}
-                    {variant === 'BIGO' && (
-                      <span className="text-blue-300">
-                        <b>BIGO (5-Card Hi-Lo) 規則：</b>
-                        <br />• <b>高牌：</b><b className="text-white underline">強制 2+3</b>。從 5 張手牌選 2 張，搭配 3 張公牌。
-                        <br />• <b>低牌 (Low)：</b>需有 5 張不重複且 <b>8 或以下</b>的牌。A 算 1。若多人符合，數字最小者贏。
-                      </span>
-                    )}
-                  </span>
-                </p>
+        <div className="max-w-4xl mx-auto mb-10">
+          <div className="bg-white/5 border border-white/10 p-6 rounded-2xl flex gap-6 items-center">
+            <div className="bg-poker-gold/20 p-4 rounded-2xl">{mode === 'SPLIT_POT' ? <Calculator className="w-8 h-8 text-poker-gold" /> : <Eye className="w-8 h-8 text-blue-400" />}</div>
+            <div className="space-y-1 text-slate-400">
+              <h3 className="text-white font-black uppercase tracking-wider">{mode === 'SPLIT_POT' ? '底池分配練習' : '勝負判斷練習'}</h3>
+              <p className="text-xs leading-relaxed">{mode === 'SPLIT_POT' ? '計算主池與邊池金額，並依排名分配。注意 ID 較小者優先獲得餘數。' : `判斷 ${variant} 規則下的贏家。${variant !== 'HOLDEM' ? '注意 2+3 強制規則。' : ''}`}</p>
+              {mode === 'SHOWDOWN' && (<div className="mt-2 p-2 bg-blue-500/10 border-l-2 border-blue-500 text-[10px] text-blue-300">
+                {variant === 'HOLDEM' ? '任意挑選 5 張。' : (variant === 'OMAHA' ? '強制 2 手牌 + 3 公牌。' : '高牌強制 2+3；低牌需 5 張 8 以下且不重複。')}
+              </div>)}
+              <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-3 h-3 text-orange-500" />
+                  <div className="text-[10px]"><span className="text-white font-bold">連勝加成：</span>每連勝一場 +20% 分數</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="w-3 h-3 text-green-400" />
+                  <div className="text-[10px]"><span className="text-white font-bold">速度獎勵：</span>10秒內答對享 1.5x 加成</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Star className="w-3 h-3 text-yellow-500" />
+                  <div className="text-[10px]"><span className="text-white font-bold">難度倍率：</span>BIGO(2x) &gt; Omaha(1.5x)</div>
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
-
         {mode === 'SPLIT_POT' ? renderSplitPot() : renderShowdown()}
-
-        {/* --- Submission Modal --- */}
         {showSubmitModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900 border-2 border-poker-gold p-8 rounded-[2rem] max-w-sm w-full text-center shadow-[0_0_50px_rgba(201,160,80,0.2)]">
-              <Trophy className="w-16 h-16 text-poker-gold mx-auto mb-4" />
-              <h2 className="text-2xl font-black text-white mb-2">練習結束！</h2>
-              <div className="bg-white/5 rounded-2xl p-4 mb-6">
-                <div className="text-slate-400 text-xs uppercase font-bold">最終得分</div>
-                <div className="text-4xl font-black text-poker-gold">{finalScore.toLocaleString()}</div>
-                <div className="text-slate-500 text-[10px] mt-1">連勝次數: {finalStreak}</div>
-              </div>
-              <input 
-                type="text" 
-                placeholder="輸入你的稱號 (最多12字)" 
-                value={playerName}
-                maxLength={12}
-                onChange={(e) => setPlayerName(e.target.value.replace(/[<>]/g, ''))}
-                className="w-full bg-black/50 border-2 border-white/10 rounded-xl p-4 text-white text-center font-bold mb-4 focus:border-poker-gold outline-none"
-              />
-              <div className="flex gap-3">
-                <button onClick={() => setShowSubmitModal(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">跳過</button>
-                <button 
-                  onClick={handleSubmitScore} 
-                  disabled={isSubmitting || !playerName.trim() || playerName.length > 12}
-                  className="flex-1 bg-poker-gold disabled:opacity-50 text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "登錄排行"}
-                </button>
-              </div>
+              <Trophy className="w-16 h-16 text-poker-gold mx-auto mb-4" /><h2 className="text-2xl font-black text-white mb-2">挑戰結束！</h2>
+              <div className="bg-white/5 rounded-2xl p-4 mb-6"><div className="text-slate-400 text-xs uppercase font-bold">最終得分</div><div className="text-4xl font-black text-poker-gold">{finalScore.toLocaleString()}</div><div className="text-slate-500 text-[10px] mt-1">連勝次數: {finalStreak}</div></div>
+              <input type="text" placeholder="輸入稱號 (12字內)" value={playerName} maxLength={12} onChange={e => setPlayerName(e.target.value)} className="w-full bg-black/50 border-2 border-white/10 rounded-xl p-4 text-white text-center font-bold mb-4 focus:border-poker-gold outline-none" />
+              <div className="flex gap-3"><button onClick={() => {setShowSubmitModal(false); setTotalScore(0);}} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs">跳過</button><button onClick={handleSubmitScore} disabled={isSubmitting || !playerName.trim()} className="flex-1 bg-poker-gold text-poker-green py-4 rounded-xl font-black uppercase text-xs shadow-lg">{isSubmitting ? <Loader2 className="animate-spin" /> : "登錄排行"}</button></div>
             </div>
           </div>
         )}
-
-        {/* --- Leaderboard Modal --- */}
         {showRankModal && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 border-2 border-poker-gold/30 p-6 md:p-10 rounded-[2.5rem] max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col shadow-2xl">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black text-poker-gold tracking-widest flex items-center gap-3"><Medal className="w-8 h-8" /> 全球荷官排行榜</h2>
-                <button onClick={() => setShowRankModal(false)} className="text-slate-500 hover:text-white"><XCircle /></button>
+            <div className="bg-slate-900 border-2 border-poker-gold/30 p-8 rounded-[2.5rem] max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl">
+              <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black text-poker-gold flex items-center gap-3"><Medal className="w-8 h-8" /> 全球荷官排行榜</h2><button onClick={() => setShowRankModal(false)} className="text-slate-500"><XCircle /></button></div>
+              <div className="flex-1 overflow-y-auto space-y-2">
+                {isLoadingRank ? <div className="text-center py-20 text-slate-500">讀取中...</div> : leaderboard.map((e, i) => (
+                  <div key={e.id} className="bg-white/5 p-4 rounded-2xl flex items-center justify-between"><div className="flex items-center gap-4"><div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black", i === 0 ? "bg-poker-gold text-poker-green" : "bg-slate-800 text-slate-400")}>{i + 1}</div><div className="font-bold text-white">{e.name}</div></div><div className="text-right"><div className="text-lg font-black text-white">{e.score.toLocaleString()}</div><div className="text-[10px] text-poker-gold font-bold">STREAK: {e.streak}</div></div></div>
+                ))}
               </div>
-              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {isLoadingRank ? (
-                  <div className="flex flex-col items-center py-20 text-slate-500">
-                    <Loader2 className="w-10 h-10 animate-spin mb-4" />
-                    <div className="font-bold uppercase tracking-widest text-xs">讀取排行中...</div>
-                  </div>
-                ) : leaderboard.length > 0 ? (
-                  leaderboard.map((entry, index) => (
-                    <div key={entry.id} className="bg-white/5 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-black", index === 0 ? "bg-poker-gold text-poker-green" : "bg-slate-800 text-slate-400")}>{index + 1}</div>
-                        <div>
-                          <div className="font-bold text-white">{entry.name}</div>
-                          <div className="text-[10px] text-slate-500">{new Date(entry.created_at).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-black text-white">{entry.score.toLocaleString()}</div>
-                        <div className="text-[10px] text-poker-gold font-bold uppercase">STREAK: {entry.streak}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-20 text-slate-600 font-bold uppercase tracking-widest text-xs">尚無紀錄</div>
-                )}
-              </div>
-              <button onClick={() => setShowRankModal(false)} className="mt-8 w-full py-4 bg-white/5 text-slate-400 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-white/10">關閉視窗</button>
+              <button onClick={() => setShowRankModal(false)} className="mt-8 w-full py-4 bg-white/5 text-slate-400 rounded-xl font-bold uppercase text-xs">關閉</button>
             </div>
           </div>
         )}
-
-        <footer className="mt-12 md:mt-20 text-center text-slate-500 text-[8px] md:text-[10px] border-t border-white/5 pt-8 uppercase tracking-[0.2em]">Professional Dealer Training Utility • 2026</footer>
+        <footer className="mt-20 text-center text-slate-500 text-[10px] border-t border-white/5 pt-8 uppercase tracking-[0.2em]">Professional Dealer Training Utility • 2026</footer>
       </div>
     </div>
   );
 };
-
 export default App;
