@@ -135,56 +135,49 @@ const App: React.FC = () => {
   const isSafariOrPrivateBrowser = () => {
     const ua = navigator.userAgent.toLowerCase();
     
-    // 偵測 Safari（但不是 Chrome）
-    const isSafari = ua.includes('safari') && !ua.includes('chrome') && !ua.includes('crios') && !ua.includes('fxios');
+    // 偵測 Safari (排除 Chrome/Firefox/Edge 等)
+    const isSafari = ua.includes('safari') && !ua.includes('chrome') && !ua.includes('crios') && !ua.includes('fxios') && !ua.includes('edgios');
     
     // 偵測 Firefox
-    const isFirefox = ua.includes('firefox');
+    const isFirefox = ua.includes('firefox') || ua.includes('fxios');
     
     // 偵測 Brave
     const isBrave = !!(navigator as any).brave;
     
-    return isSafari || isFirefox || isBrave || isInAppBrowser();
+    return isSafari || isFirefox || isBrave;
   };
 
   const handleGoogleLogin = async () => {
-    // 如果是社群媒體內建瀏覽器，先顯示提示
+    // 如果是社群媒體內建瀏覽器，顯示提示並使用 redirect
     if (isInAppBrowser()) {
       setShowInAppBrowserWarning(true);
       return;
     }
 
     try {
-      // Safari、Firefox、Brave 直接使用 redirect
-      if (isSafariOrPrivateBrowser()) {
-        console.log("Detected privacy-focused browser, using redirect login");
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
-      
-      // 其他瀏覽器優先使用 popup
+      console.log("Attempting popup login...");
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error("Popup login failed:", error);
       
-      // 如果是 popup 相關錯誤，嘗試使用 redirect
-      if (
+      // 如果 Popup 被阻擋、使用者關閉、或者在隱私瀏覽器中發生特定錯誤，則嘗試 Redirect
+      const shouldFallbackToRedirect = 
         error.code === 'auth/popup-blocked' || 
         error.code === 'auth/popup-closed-by-user' ||
-        error.message?.includes('sessionStorage') ||
-        error.message?.includes('popup')
-      ) {
+        error.code === 'auth/internal-error' ||
+        error.message?.includes('storage') ||
+        isSafariOrPrivateBrowser();
+
+      if (shouldFallbackToRedirect) {
         try {
           console.log("Falling back to redirect login...");
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectError: any) {
           console.error("Redirect login failed:", redirectError);
-          alert('登入失敗。請嘗試：\n1. 使用外部瀏覽器開啟\n2. 允許 Cookies\n3. 關閉隱私保護模式');
+          alert('登入失敗。請嘗試：\n1. 使用外部瀏覽器 (Chrome/Safari) 開啟\n2. 關閉「防止跨網站追蹤」\n3. 確保未開啟私密瀏覽模式');
         }
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        // 使用者取消，不顯示錯誤
-      } else {
-        alert(`登入失敗：${error.message || '未知錯誤'}`);
+      } else if (error.code !== 'auth/cancelled-popup-request') {
+        alert(`登入發生錯誤：${error.message || '未知錯誤'}`);
       }
     }
   };
@@ -223,22 +216,39 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log("App mounted, checking auth state...");
+    
     // 檢查 redirect 登入結果
     getRedirectResult(auth).then((result) => {
       if (result?.user) {
-        console.log("Redirect login successful");
+        console.log("Redirect login successful:", result.user.email);
+      } else {
+        console.log("No redirect result found.");
       }
     }).catch((error) => {
-      console.error("Redirect result error:", error);
-      if (!error.message?.includes('no redirect operation')) {
-        alert('登入過程發生錯誤，請重試');
+      console.error("Redirect result error details:", {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
+      
+      // 只有在真的有錯誤（且不是正常的「無跳轉」狀態）才警告
+      if (error.code !== 'auth/no-redirect-operation' && !error.message?.includes('no redirect operation')) {
+        alert(`登入過程發生錯誤 (${error.code})，請重試。\n提示：若使用 Safari，請嘗試關閉「防止跨網站追蹤」。`);
       }
     });
 
     // 監聽認證狀態變化
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) fetchProfile(firebaseUser.uid);
+      if (firebaseUser) {
+        console.log("Auth state changed: User is logged in", firebaseUser.uid);
+        setUser(firebaseUser);
+        fetchProfile(firebaseUser.uid);
+      } else {
+        console.log("Auth state changed: User is logged out");
+        setUser(null);
+        setProfile(null);
+      }
     });
     return () => unsubscribe();
   }, []);
