@@ -25,3 +25,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Build test output
+dist-test/
+dist-test2/
+
+# Backup files
+*.bak
+*.backup
+
+# Local Claude config
+.claude/
+
+# Screenshots / scratch
+截圖.png
+*.original

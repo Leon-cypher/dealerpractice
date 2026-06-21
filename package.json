@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "lab": "vite lab -c vite.config.ts",
-    "build": "tsc && vite build",
+    "build": "node -e \"const {execSync}=require('child_process');try{execSync('cmd /c rmdir /s /q dist')}catch(e){}\" && tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
+    "@letele/playing-cards": "^0.1.0",
     "@supabase/supabase-js": "^2.39.7",
     "clsx": "^2.1.1",
     "firebase": "^12.9.0",
@@ -18,6 +20,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-easy-crop": "^5.5.6",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^7.13.0",
     "tailwind-merge": "^2.5.2"
   },
   "devDependencies": {
@@ -31,9 +35,12 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.11",
     "gh-pages": "^6.3.0",
+    "jimp": "^1.6.0",
     "postcss": "^8.4.44",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.3",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }
